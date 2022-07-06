@@ -1,88 +1,128 @@
-# Mapv - 地理信息可视化开源库 [![npm version](https://img.shields.io/npm/v/mapv.svg)](https://www.npmjs.com/package/mapv)
-<a href="http://mapv.baidu.com/">
-    <img style="vertical-align: top;" src="./asset/logo.png?raw=true" alt="logo">
-</a>
+# cesium-mapv [![npm version](https://img.shields.io/npm/v/cesium-mapv.svg)](https://www.npmjs.com/package/cesium-mapv)
 
-主页: [http://mapv.baidu.com/](http://mapv.baidu.com/)
+This is a fork from [mapv](https://github.com/huiyan-fe/mapv), enable working in morden es module cesium project.
 
-备用主页: [huiyan-fe.github.io/mapv/](http://huiyan-fe.github.io/mapv/)
+## Install
 
-## 简介 [English](https://github.com/huiyan-fe/mapv/blob/master/README_EN.md)
-Mapv 是一款地理信息可视化开源库，可以用来展示大量地理信息数据，点、线、面的数据，每种数据也有不同的展示类型，如直接打点、热力图、网格、聚合等方式展示数据。
-当前是Mapv 2.0的预发布版本，当前api是不稳定的并有可能随时发生变化。
+```base
+yarn add cesium-mapv
+```
 
-## 示例
-<a href="http://mapv.baidu.com/gallery.html">
-    <img style="vertical-align: top;" src="./asset/overview.jpg?raw=true" alt="logo">
-</a>
+## Usage
 
-## 相关文档
-[API 参考](https://github.com/huiyan-fe/mapv/blob/master/API.md)
+```ts
+import { CesiumMapLayer, DataSet, MapVDataSet, MapVOptions } from 'cesium-mapv'
 
-## 支持环境
-Mapv使用canvas开发，支持现在被称为“现代”浏览器, 通常兼容除了IE8及IE以下版本的其他大部分浏览器。
-## 安装使用
+const randomCount = 100
+const data: MapVDataSet = []
+while (randomCount--) {
+  data.push({
+    geometry: {
+      type: 'Point',
+      coordinates: [-125.8 + Math.random() * 50, 30.3 + Math.random() * 20]
+    },
+    count: 30 * Math.random()
+  })
+}
 
-## NPM
-如果你使用NPM开发环境，可使用NPM 安装，Mapv 能很好地和诸如 Webpack、Browserify 或 fis 的 CommonJS 模块打包器配合使用。
+const opts: MapVOptions = {
+  fillStyle: 'rgba(55, 50, 250, 0.8)',
+  shadowColor: 'rgba(255, 250, 50, 1)',
+  shadowBlur: 20,
+  max: 100,
+  size: 50,
+  label: {
+      show: true,
+      fillStyle: 'white',
+      // shadowColor: 'yellow',
+      // font: '20px Arial',
+      // shadowBlur: 10,
+  },
+  globalAlpha: 0.5,
+  gradient: { 0.25: "rgb(0,0,255)", 0.55: "rgb(0,255,0)", 0.85: "yellow", 1.0: "rgb(255,0,0)" },
+  draw: 'honeycomb'
+}
 
-    npm install mapv
+const dataSet = new DataSet(data)
+const layer = new CesiumMapLayer(viewer, dataSet, opts)
+```
 
-## 安装使用
-你可以直接加载官网(mapv.baidu.com)最新的js脚本文件。如:
+## Example
 
-    <script src="http://mapv.baidu.com/build/mapv.min.js"></script>
+<img style="vertical-align: top;" src="./asset/honeycomb.png?raw=true" alt="logo">
 
-或
+## API
 
-    <script src="http://huiyan-fe.github.io/mapv/build/mapv.min.js"></script>
+Detail please reference to [mapv's API doc](https://github.com/huiyan-fe/mapv/blob/master/API.md), or [TS define(incomplete)](https://github.com/hongfaqiu/cesium-mapv/blob/master/typings/index.d.ts)
 
-你也可以下载[最后发布的版本](https://github.com/huiyan-fe/mapv/releases)。也可以使用示例中的版本。
-### 初始化环境
-    npm install
-### 开发
-    npm test
-### 发布
-    npm run publish
+```ts
+class DataSet {
+  constructor(data: MapVDataSet);
+  /**
+   * 通过此方法可以获取当前数据集的数据
+   * 同时可通过filter参数方法获取过滤后的数据
+   */
+  get(opts?: {
+    filter: (item: MapVDataSetItem) => boolean
+  }): MapVDataSet;
 
-## 谁在使用
+  /** 通过此方法可以修改数据集的内容 */
+  set(MapVDataSet): void
+}
 
-[![百度慧眼](./asset/user/huiyan.png)](http://huiyan.baidu.com)
+class CesiumMapLayer {
+  mapvBaseLayer: MapVRenderer;
+  mapVOptions: MapVOptions;
+  container: HTMLElement;
+  map: Viewer;
+  /**
+   *Creates an instance of CesiumMapLayer.
+  * @param {*} viewer
+  * @param {*} dataset
+  * @param {*} options
+  * @param {*} container default viewer.container
+  * @memberof CesiumMapLayer
+  */
+  constructor(viewer: Viewer, dataSet: DataSet, options: MapVOptions, container?: HTMLElement);
 
-[![百度交通云](./asset/user/jiaotong.png)](http://jiaotong.baidu.com/)
+  render(): void;
+  remove(): void;
+  resizeCanvas(): void;
 
-[![百度地图开放平台](./asset/user/lbsyun.png)](http://lbsyun.baidu.com/)
+  update(opts: {
+    data?: MapVDataSet;
+    options?: MapVOptions;
+  })
 
-## 联系我们
-邮箱: <a href="mailto:mapv@baidu.com">mapv@baidu.com</a>
+  /** 销毁当前图层 */
+  destroy(): void;
+}
 
-QQ群: 321519841
+class MapVRenderer {
+  dataSet: MapVDataSet;
+  options: MapVOptions;
+  /**
+   *Creates an instance of MapVLayer.
+  * @param {*} viewer
+  * @param {*} dataset
+  * @param {*} options
+  * @param {*} container default viewer.container
+  * @memberof MapVLayer
+  */
+  constructor(viewer: Viewer, dataSet: DataSet, options: MapVOptions, mapVLayer: CesiumMapLayer);
+  /** 修改配置 */
+  update(options: Partial<MapVOptions>): void;
+  /** 重新设置配置 */
+  setOptions(options: Partial<MapVOptions>): void;
+  /** 显示图层 */
+  show(): void;
+  /** 隐藏图层 */
+  hide(): void;
+  /** 销毁当前图层 */
+  destroy(): void;
+}
+```
 
-## 许可证
-Copyright (c) 2016, Baidu, Inc.
-All rights reserved.
+## Credit
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of the Baidu, Inc. nor the names of it
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+<https://github.com/huiyan-fe/mapv>
