@@ -33,6 +33,16 @@ class CesiumMapLayer {
       this.bindEvent();
       this._reset();
   }
+
+  get show() {
+    return this.viewer.style.display === "block"
+  }
+
+  set show(val) {
+    if (val) this.show()
+    else this.hide()
+  }
+
   initDevicePixelRatio() {
       this.devicePixelRatio = window.devicePixelRatio || 1
   }

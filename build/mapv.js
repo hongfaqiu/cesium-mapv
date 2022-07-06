@@ -4981,18 +4981,18 @@ var MapVRenderer = function (_BaseLayer) {
 
 var defIndex = 0;
 
-var MapVLayer = function () {
+var CesiumMapLayer = function () {
     /**
-     *Creates an instance of MapVLayer.
+     *Creates an instance of CesiumMapLayer.
      * @param {*} viewer
      * @param {*} dataset
      * @param {*} options
      * @param {*} container default viewer.container
-     * @memberof MapVLayer
+     * @memberof CesiumMapLayer
      */
-    function MapVLayer(viewer, dataset, options) {
+    function CesiumMapLayer(viewer, dataset, options) {
         var container = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : undefined;
-        classCallCheck(this, MapVLayer);
+        classCallCheck(this, CesiumMapLayer);
 
         this.map = viewer, this.scene = viewer.scene, this.mapvBaseLayer = new MapVRenderer(viewer, dataset, options, this), this.mapVOptions = options, this.initDevicePixelRatio(), this.canvas = this._createCanvas(), this.render = this.render.bind(this);
         if (container) {
@@ -5010,7 +5010,7 @@ var MapVLayer = function () {
         this._reset();
     }
 
-    createClass(MapVLayer, [{
+    createClass(CesiumMapLayer, [{
         key: 'initDevicePixelRatio',
         value: function initDevicePixelRatio() {
             this.devicePixelRatio = window.devicePixelRatio || 1;
@@ -5174,11 +5174,19 @@ var MapVLayer = function () {
         value: function render() {
             void 0 != this.mapvBaseLayer && this.mapvBaseLayer._canvasUpdate();
         }
+    }, {
+        key: 'show',
+        get: function get$$1() {
+            return this.viewer.style.display === "block";
+        },
+        set: function set$$1(val) {
+            if (val) this.show();else this.hide();
+        }
     }]);
-    return MapVLayer;
+    return CesiumMapLayer;
 }();
 
-exports.CesiumMapLayer = MapVLayer;
+exports.CesiumMapLayer = CesiumMapLayer;
 exports.MapVRenderer = MapVRenderer;
 exports.BaseLayer = BaseLayer;
 exports.DataSet = DataSet;

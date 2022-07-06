@@ -1,6 +1,6 @@
 {
   "name": "cesium-mapv",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "a library of geography visualization",
   "main": "build/mapv.js",
   "types": "typings/index.d.ts",
@@ -16,14 +16,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/huiyan-fe/mapv.git"
+    "url": "git+https://github.com/hongfaqiu/cesium-mapv.git"
   },
   "author": "huiyan-fe",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/huiyan-fe/mapv/issues"
   },
-  "homepage": "https://github.com/huiyan-fe/mapv#readme",
+  "homepage": "https://github.com/hongfaqiu/cesium-mapv#readme",
   "devDependencies": {
     "babel-helpers": "^6.24.1",
     "babel-plugin-transform-remove-console": "^6.9.4",
