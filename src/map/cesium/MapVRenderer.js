@@ -1,8 +1,9 @@
 import BaseLayer from "../BaseLayer";
 import DataSet from "../../data/DataSet";
+import * as Cesium from 'cesium';
 
 
-export class MapVRenderer extends BaseLayer {
+class MapVRenderer extends BaseLayer {
 
     /**
      * Creates an instance of MapVRenderer.
@@ -157,3 +158,5 @@ export class MapVRenderer extends BaseLayer {
         t && t.clearRect && t.clearRect(0, 0, t.canvas.width, t.canvas.height)
     }
 }
+
+export default MapVRenderer

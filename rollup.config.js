@@ -7,12 +7,14 @@ export default {
 	external: [
 		'maptalks',
 		'openlayers',
-		'leaflet'
+    'leaflet',
+    'cesium'
 	],
   globals: {
     openlayers: 'ol',
     leaflet: 'L',
-    maptalks: 'maptalks'
+    maptalks: 'maptalks',
+    cesium: 'cesium'
   },
 	plugins: [
 		babel({

@@ -1,33 +1,8 @@
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.mapv = global.mapv || {})));
-}(this, (function (exports) { 'use strict';
-
-var version = "2.0.62";
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-var clear = function (context) {
-    context && context.clearRect && context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-    //context.canvas.width = context.canvas.width;
-    //context.canvas.height = context.canvas.height;
-};
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-var resolutionScale$1 = function (context) {
-    var devicePixelRatio = window.devicePixelRatio || 1;
-    context.canvas.width = context.canvas.width * devicePixelRatio;
-    context.canvas.height = context.canvas.height * devicePixelRatio;
-    context.canvas.style.width = context.canvas.width / devicePixelRatio + 'px';
-    context.canvas.style.height = context.canvas.height / devicePixelRatio + 'px';
-    context.scale(devicePixelRatio, devicePixelRatio);
-};
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('cesium')) :
+	typeof define === 'function' && define.amd ? define(['exports', 'cesium'], factory) :
+	(factory((global.mapv = global.mapv || {}),global.cesium));
+}(this, (function (exports,Cesium) { 'use strict';
 
 function Event() {
   this._subscribers = {}; // event subscribers
@@ -633,223 +608,782 @@ DataSet.prototype.getUnique = function (columnName) {
     return data;
 };
 
-function hex_corner(center, size, i) {
-    var angle_deg = 60 * i + 30;
-    var angle_rad = Math.PI / 180 * angle_deg;
-    return [center.x + size * Math.cos(angle_rad), center.y + size * Math.sin(angle_rad)];
-}
-
-function draw(context, x, y, size) {
-
-    for (var j = 0; j < 6; j++) {
-
-        var result = hex_corner({
-            x: x,
-            y: y
-        }, size, j);
-
-        context.lineTo(result[0], result[1]);
-    }
-}
-
 /**
- * @author kyle / http://nikai.us/
+ * Tween.js - Licensed under the MIT license
+ * https://github.com/tweenjs/tween.js
+ * ----------------------------------------------
+ *
+ * See https://github.com/tweenjs/tween.js/graphs/contributors for the full list of contributors.
+ * Thank you all, you're awesome!
  */
 
-var pathSimple = {
-    drawDataSet: function drawDataSet(context, dataSet, options) {
+var TWEEN = TWEEN || function () {
 
-        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+        var _tweens = [];
 
-        for (var i = 0, len = data.length; i < len; i++) {
-            var item = data[i];
-            this.draw(context, item, options);
-        }
-    },
-    draw: function draw$$1(context, data, options) {
-        var type = data.geometry.type;
-        var coordinates = data.geometry._coordinates || data.geometry.coordinates;
-        var symbol = data.symbol || options.symbol || 'circle';
-        switch (type) {
-            case 'Point':
-                var size = data._size || data.size || options._size || options.size || 5;
-                if (symbol === 'circle') {
-                    if (options.bigData === 'Point') {
-                        context.moveTo(coordinates[0], coordinates[1]);
-                    }
-                    context.arc(coordinates[0], coordinates[1], size, 0, Math.PI * 2);
-                } else if (symbol === 'rect') {
-                    context.rect(coordinates[0] - size / 2, coordinates[1] - size / 2, size, size);
-                } else if (symbol === 'honeycomb') {
-                    draw(context, coordinates[0], coordinates[1], size);
-                }
-                break;
-            case 'LineString':
-                this.drawLineString(context, coordinates);
-                break;
-            case 'MultiLineString':
-                for (var i = 0; i < coordinates.length; i++) {
-                    var lineString = coordinates[i];
-                    this.drawLineString(context, lineString);
-                }
-                break;
-            case 'Polygon':
-                this.drawPolygon(context, coordinates);
-                break;
-            case 'MultiPolygon':
-                for (var i = 0; i < coordinates.length; i++) {
-                    var polygon = coordinates[i];
-                    this.drawPolygon(context, polygon);
-                    if (options.multiPolygonDraw) {
-                        var flag = options.multiPolygonDraw();
-                        if (flag) {
-                            return flag;
+        return {
+
+                getAll: function getAll() {
+
+                        return _tweens;
+                },
+
+                removeAll: function removeAll() {
+
+                        _tweens = [];
+                },
+
+                add: function add(tween) {
+
+                        _tweens.push(tween);
+                },
+
+                remove: function remove(tween) {
+
+                        var i = _tweens.indexOf(tween);
+
+                        if (i !== -1) {
+                                _tweens.splice(i, 1);
                         }
-                    }
+                },
+
+                update: function update(time, preserve) {
+
+                        if (_tweens.length === 0) {
+                                return false;
+                        }
+
+                        var i = 0;
+
+                        time = time !== undefined ? time : TWEEN.now();
+
+                        while (i < _tweens.length) {
+
+                                if (_tweens[i].update(time) || preserve) {
+                                        i++;
+                                } else {
+                                        _tweens.splice(i, 1);
+                                }
+                        }
+
+                        return true;
                 }
-                break;
-            default:
-                console.error('type' + type + 'is not support now!');
-                break;
+        };
+}();
+
+// Include a performance.now polyfill.
+// In node.js, use process.hrtime.
+if (typeof window === 'undefined' && typeof process !== 'undefined') {
+        TWEEN.now = function () {
+                var time = process.hrtime();
+
+                // Convert [seconds, nanoseconds] to milliseconds.
+                return time[0] * 1000 + time[1] / 1000000;
+        };
+}
+// In a browser, use window.performance.now if it is available.
+else if (typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined) {
+                // This must be bound, because directly assigning this function
+                // leads to an invocation exception in Chrome.
+                TWEEN.now = window.performance.now.bind(window.performance);
         }
-    },
+        // Use Date.now if it is available.
+        else if (Date.now !== undefined) {
+                        TWEEN.now = Date.now;
+                }
+                // Otherwise, use 'new Date().getTime()'.
+                else {
+                                TWEEN.now = function () {
+                                        return new Date().getTime();
+                                };
+                        }
 
-    drawLineString: function drawLineString(context, coordinates) {
-        for (var j = 0; j < coordinates.length; j++) {
-            var x = coordinates[j][0];
-            var y = coordinates[j][1];
-            if (j == 0) {
-                context.moveTo(x, y);
-            } else {
-                context.lineTo(x, y);
-            }
+TWEEN.Tween = function (object) {
+
+        var _object = object;
+        var _valuesStart = {};
+        var _valuesEnd = {};
+        var _valuesStartRepeat = {};
+        var _duration = 1000;
+        var _repeat = 0;
+        var _repeatDelayTime;
+        var _yoyo = false;
+        var _isPlaying = false;
+        var _reversed = false;
+        var _delayTime = 0;
+        var _startTime = null;
+        var _easingFunction = TWEEN.Easing.Linear.None;
+        var _interpolationFunction = TWEEN.Interpolation.Linear;
+        var _chainedTweens = [];
+        var _onStartCallback = null;
+        var _onStartCallbackFired = false;
+        var _onUpdateCallback = null;
+        var _onCompleteCallback = null;
+        var _onStopCallback = null;
+
+        this.to = function (properties, duration) {
+
+                _valuesEnd = properties;
+
+                if (duration !== undefined) {
+                        _duration = duration;
+                }
+
+                return this;
+        };
+
+        this.start = function (time) {
+
+                TWEEN.add(this);
+
+                _isPlaying = true;
+
+                _onStartCallbackFired = false;
+
+                _startTime = time !== undefined ? time : TWEEN.now();
+                _startTime += _delayTime;
+
+                for (var property in _valuesEnd) {
+
+                        // Check if an Array was provided as property value
+                        if (_valuesEnd[property] instanceof Array) {
+
+                                if (_valuesEnd[property].length === 0) {
+                                        continue;
+                                }
+
+                                // Create a local copy of the Array with the start value at the front
+                                _valuesEnd[property] = [_object[property]].concat(_valuesEnd[property]);
+                        }
+
+                        // If `to()` specifies a property that doesn't exist in the source object,
+                        // we should not set that property in the object
+                        if (_object[property] === undefined) {
+                                continue;
+                        }
+
+                        // Save the starting value.
+                        _valuesStart[property] = _object[property];
+
+                        if (_valuesStart[property] instanceof Array === false) {
+                                _valuesStart[property] *= 1.0; // Ensures we're using numbers, not strings
+                        }
+
+                        _valuesStartRepeat[property] = _valuesStart[property] || 0;
+                }
+
+                return this;
+        };
+
+        this.stop = function () {
+
+                if (!_isPlaying) {
+                        return this;
+                }
+
+                TWEEN.remove(this);
+                _isPlaying = false;
+
+                if (_onStopCallback !== null) {
+                        _onStopCallback.call(_object, _object);
+                }
+
+                this.stopChainedTweens();
+                return this;
+        };
+
+        this.end = function () {
+
+                this.update(_startTime + _duration);
+                return this;
+        };
+
+        this.stopChainedTweens = function () {
+
+                for (var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++) {
+                        _chainedTweens[i].stop();
+                }
+        };
+
+        this.delay = function (amount) {
+
+                _delayTime = amount;
+                return this;
+        };
+
+        this.repeat = function (times) {
+
+                _repeat = times;
+                return this;
+        };
+
+        this.repeatDelay = function (amount) {
+
+                _repeatDelayTime = amount;
+                return this;
+        };
+
+        this.yoyo = function (yoyo) {
+
+                _yoyo = yoyo;
+                return this;
+        };
+
+        this.easing = function (easing) {
+
+                _easingFunction = easing;
+                return this;
+        };
+
+        this.interpolation = function (interpolation) {
+
+                _interpolationFunction = interpolation;
+                return this;
+        };
+
+        this.chain = function () {
+
+                _chainedTweens = arguments;
+                return this;
+        };
+
+        this.onStart = function (callback) {
+
+                _onStartCallback = callback;
+                return this;
+        };
+
+        this.onUpdate = function (callback) {
+
+                _onUpdateCallback = callback;
+                return this;
+        };
+
+        this.onComplete = function (callback) {
+
+                _onCompleteCallback = callback;
+                return this;
+        };
+
+        this.onStop = function (callback) {
+
+                _onStopCallback = callback;
+                return this;
+        };
+
+        this.update = function (time) {
+
+                var property;
+                var elapsed;
+                var value;
+
+                if (time < _startTime) {
+                        return true;
+                }
+
+                if (_onStartCallbackFired === false) {
+
+                        if (_onStartCallback !== null) {
+                                _onStartCallback.call(_object, _object);
+                        }
+
+                        _onStartCallbackFired = true;
+                }
+
+                elapsed = (time - _startTime) / _duration;
+                elapsed = elapsed > 1 ? 1 : elapsed;
+
+                value = _easingFunction(elapsed);
+
+                for (property in _valuesEnd) {
+
+                        // Don't update properties that do not exist in the source object
+                        if (_valuesStart[property] === undefined) {
+                                continue;
+                        }
+
+                        var start = _valuesStart[property] || 0;
+                        var end = _valuesEnd[property];
+
+                        if (end instanceof Array) {
+
+                                _object[property] = _interpolationFunction(end, value);
+                        } else {
+
+                                // Parses relative end values with start as base (e.g.: +10, -3)
+                                if (typeof end === 'string') {
+
+                                        if (end.charAt(0) === '+' || end.charAt(0) === '-') {
+                                                end = start + parseFloat(end);
+                                        } else {
+                                                end = parseFloat(end);
+                                        }
+                                }
+
+                                // Protect against non numeric properties.
+                                if (typeof end === 'number') {
+                                        _object[property] = start + (end - start) * value;
+                                }
+                        }
+                }
+
+                if (_onUpdateCallback !== null) {
+                        _onUpdateCallback.call(_object, value);
+                }
+
+                if (elapsed === 1) {
+
+                        if (_repeat > 0) {
+
+                                if (isFinite(_repeat)) {
+                                        _repeat--;
+                                }
+
+                                // Reassign starting values, restart by making startTime = now
+                                for (property in _valuesStartRepeat) {
+
+                                        if (typeof _valuesEnd[property] === 'string') {
+                                                _valuesStartRepeat[property] = _valuesStartRepeat[property] + parseFloat(_valuesEnd[property]);
+                                        }
+
+                                        if (_yoyo) {
+                                                var tmp = _valuesStartRepeat[property];
+
+                                                _valuesStartRepeat[property] = _valuesEnd[property];
+                                                _valuesEnd[property] = tmp;
+                                        }
+
+                                        _valuesStart[property] = _valuesStartRepeat[property];
+                                }
+
+                                if (_yoyo) {
+                                        _reversed = !_reversed;
+                                }
+
+                                if (_repeatDelayTime !== undefined) {
+                                        _startTime = time + _repeatDelayTime;
+                                } else {
+                                        _startTime = time + _delayTime;
+                                }
+
+                                return true;
+                        } else {
+
+                                if (_onCompleteCallback !== null) {
+
+                                        _onCompleteCallback.call(_object, _object);
+                                }
+
+                                for (var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++) {
+                                        // Make the chained tweens start exactly at the time they should,
+                                        // even if the `update()` method was called way past the duration of the tween
+                                        _chainedTweens[i].start(_startTime + _duration);
+                                }
+
+                                return false;
+                        }
+                }
+
+                return true;
+        };
+};
+
+TWEEN.Easing = {
+
+        Linear: {
+
+                None: function None(k) {
+
+                        return k;
+                }
+
+        },
+
+        Quadratic: {
+
+                In: function In(k) {
+
+                        return k * k;
+                },
+
+                Out: function Out(k) {
+
+                        return k * (2 - k);
+                },
+
+                InOut: function InOut(k) {
+
+                        if ((k *= 2) < 1) {
+                                return 0.5 * k * k;
+                        }
+
+                        return -0.5 * (--k * (k - 2) - 1);
+                }
+
+        },
+
+        Cubic: {
+
+                In: function In(k) {
+
+                        return k * k * k;
+                },
+
+                Out: function Out(k) {
+
+                        return --k * k * k + 1;
+                },
+
+                InOut: function InOut(k) {
+
+                        if ((k *= 2) < 1) {
+                                return 0.5 * k * k * k;
+                        }
+
+                        return 0.5 * ((k -= 2) * k * k + 2);
+                }
+
+        },
+
+        Quartic: {
+
+                In: function In(k) {
+
+                        return k * k * k * k;
+                },
+
+                Out: function Out(k) {
+
+                        return 1 - --k * k * k * k;
+                },
+
+                InOut: function InOut(k) {
+
+                        if ((k *= 2) < 1) {
+                                return 0.5 * k * k * k * k;
+                        }
+
+                        return -0.5 * ((k -= 2) * k * k * k - 2);
+                }
+
+        },
+
+        Quintic: {
+
+                In: function In(k) {
+
+                        return k * k * k * k * k;
+                },
+
+                Out: function Out(k) {
+
+                        return --k * k * k * k * k + 1;
+                },
+
+                InOut: function InOut(k) {
+
+                        if ((k *= 2) < 1) {
+                                return 0.5 * k * k * k * k * k;
+                        }
+
+                        return 0.5 * ((k -= 2) * k * k * k * k + 2);
+                }
+
+        },
+
+        Sinusoidal: {
+
+                In: function In(k) {
+
+                        return 1 - Math.cos(k * Math.PI / 2);
+                },
+
+                Out: function Out(k) {
+
+                        return Math.sin(k * Math.PI / 2);
+                },
+
+                InOut: function InOut(k) {
+
+                        return 0.5 * (1 - Math.cos(Math.PI * k));
+                }
+
+        },
+
+        Exponential: {
+
+                In: function In(k) {
+
+                        return k === 0 ? 0 : Math.pow(1024, k - 1);
+                },
+
+                Out: function Out(k) {
+
+                        return k === 1 ? 1 : 1 - Math.pow(2, -10 * k);
+                },
+
+                InOut: function InOut(k) {
+
+                        if (k === 0) {
+                                return 0;
+                        }
+
+                        if (k === 1) {
+                                return 1;
+                        }
+
+                        if ((k *= 2) < 1) {
+                                return 0.5 * Math.pow(1024, k - 1);
+                        }
+
+                        return 0.5 * (-Math.pow(2, -10 * (k - 1)) + 2);
+                }
+
+        },
+
+        Circular: {
+
+                In: function In(k) {
+
+                        return 1 - Math.sqrt(1 - k * k);
+                },
+
+                Out: function Out(k) {
+
+                        return Math.sqrt(1 - --k * k);
+                },
+
+                InOut: function InOut(k) {
+
+                        if ((k *= 2) < 1) {
+                                return -0.5 * (Math.sqrt(1 - k * k) - 1);
+                        }
+
+                        return 0.5 * (Math.sqrt(1 - (k -= 2) * k) + 1);
+                }
+
+        },
+
+        Elastic: {
+
+                In: function In(k) {
+
+                        if (k === 0) {
+                                return 0;
+                        }
+
+                        if (k === 1) {
+                                return 1;
+                        }
+
+                        return -Math.pow(2, 10 * (k - 1)) * Math.sin((k - 1.1) * 5 * Math.PI);
+                },
+
+                Out: function Out(k) {
+
+                        if (k === 0) {
+                                return 0;
+                        }
+
+                        if (k === 1) {
+                                return 1;
+                        }
+
+                        return Math.pow(2, -10 * k) * Math.sin((k - 0.1) * 5 * Math.PI) + 1;
+                },
+
+                InOut: function InOut(k) {
+
+                        if (k === 0) {
+                                return 0;
+                        }
+
+                        if (k === 1) {
+                                return 1;
+                        }
+
+                        k *= 2;
+
+                        if (k < 1) {
+                                return -0.5 * Math.pow(2, 10 * (k - 1)) * Math.sin((k - 1.1) * 5 * Math.PI);
+                        }
+
+                        return 0.5 * Math.pow(2, -10 * (k - 1)) * Math.sin((k - 1.1) * 5 * Math.PI) + 1;
+                }
+
+        },
+
+        Back: {
+
+                In: function In(k) {
+
+                        var s = 1.70158;
+
+                        return k * k * ((s + 1) * k - s);
+                },
+
+                Out: function Out(k) {
+
+                        var s = 1.70158;
+
+                        return --k * k * ((s + 1) * k + s) + 1;
+                },
+
+                InOut: function InOut(k) {
+
+                        var s = 1.70158 * 1.525;
+
+                        if ((k *= 2) < 1) {
+                                return 0.5 * (k * k * ((s + 1) * k - s));
+                        }
+
+                        return 0.5 * ((k -= 2) * k * ((s + 1) * k + s) + 2);
+                }
+
+        },
+
+        Bounce: {
+
+                In: function In(k) {
+
+                        return 1 - TWEEN.Easing.Bounce.Out(1 - k);
+                },
+
+                Out: function Out(k) {
+
+                        if (k < 1 / 2.75) {
+                                return 7.5625 * k * k;
+                        } else if (k < 2 / 2.75) {
+                                return 7.5625 * (k -= 1.5 / 2.75) * k + 0.75;
+                        } else if (k < 2.5 / 2.75) {
+                                return 7.5625 * (k -= 2.25 / 2.75) * k + 0.9375;
+                        } else {
+                                return 7.5625 * (k -= 2.625 / 2.75) * k + 0.984375;
+                        }
+                },
+
+                InOut: function InOut(k) {
+
+                        if (k < 0.5) {
+                                return TWEEN.Easing.Bounce.In(k * 2) * 0.5;
+                        }
+
+                        return TWEEN.Easing.Bounce.Out(k * 2 - 1) * 0.5 + 0.5;
+                }
+
         }
-    },
-
-    drawPolygon: function drawPolygon(context, coordinates) {
-        context.beginPath();
-
-        for (var i = 0; i < coordinates.length; i++) {
-            var coordinate = coordinates[i];
-
-            context.moveTo(coordinate[0][0], coordinate[0][1]);
-            for (var j = 1; j < coordinate.length; j++) {
-                context.lineTo(coordinate[j][0], coordinate[j][1]);
-            }
-            context.lineTo(coordinate[0][0], coordinate[0][1]);
-            context.closePath();
-        }
-    }
 
 };
 
-/**
- * @author kyle / http://nikai.us/
- */
+TWEEN.Interpolation = {
 
-var drawSimple = {
-    draw: function draw(context, dataSet, options) {
+        Linear: function Linear(v, k) {
 
-        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+                var m = v.length - 1;
+                var f = m * k;
+                var i = Math.floor(f);
+                var fn = TWEEN.Interpolation.Utils.Linear;
 
-        // console.log('xxxx',options)
-        context.save();
+                if (k < 0) {
+                        return fn(v[0], v[1], f);
+                }
 
-        for (var key in options) {
-            context[key] = options[key];
+                if (k > 1) {
+                        return fn(v[m], v[m - 1], m - f);
+                }
+
+                return fn(v[i], v[i + 1 > m ? m : i + 1], f - i);
+        },
+
+        Bezier: function Bezier(v, k) {
+
+                var b = 0;
+                var n = v.length - 1;
+                var pw = Math.pow;
+                var bn = TWEEN.Interpolation.Utils.Bernstein;
+
+                for (var i = 0; i <= n; i++) {
+                        b += pw(1 - k, n - i) * pw(k, i) * v[i] * bn(n, i);
+                }
+
+                return b;
+        },
+
+        CatmullRom: function CatmullRom(v, k) {
+
+                var m = v.length - 1;
+                var f = m * k;
+                var i = Math.floor(f);
+                var fn = TWEEN.Interpolation.Utils.CatmullRom;
+
+                if (v[0] === v[m]) {
+
+                        if (k < 0) {
+                                i = Math.floor(f = m * (1 + k));
+                        }
+
+                        return fn(v[(i - 1 + m) % m], v[i], v[(i + 1) % m], v[(i + 2) % m], f - i);
+                } else {
+
+                        if (k < 0) {
+                                return v[0] - (fn(v[0], v[0], v[1], v[1], -f) - v[0]);
+                        }
+
+                        if (k > 1) {
+                                return v[m] - (fn(v[m], v[m], v[m - 1], v[m - 1], f - m) - v[m]);
+                        }
+
+                        return fn(v[i ? i - 1 : 0], v[i], v[m < i + 1 ? m : i + 1], v[m < i + 2 ? m : i + 2], f - i);
+                }
+        },
+
+        Utils: {
+
+                Linear: function Linear(p0, p1, t) {
+
+                        return (p1 - p0) * t + p0;
+                },
+
+                Bernstein: function Bernstein(n, i) {
+
+                        var fc = TWEEN.Interpolation.Utils.Factorial;
+
+                        return fc(n) / fc(i) / fc(n - i);
+                },
+
+                Factorial: function () {
+
+                        var a = [1];
+
+                        return function (n) {
+
+                                var s = 1;
+
+                                if (a[n]) {
+                                        return a[n];
+                                }
+
+                                for (var i = n; i > 1; i--) {
+                                        s *= i;
+                                }
+
+                                a[n] = s;
+                                return s;
+                        };
+                }(),
+
+                CatmullRom: function CatmullRom(p0, p1, p2, p3, t) {
+
+                        var v0 = (p2 - p0) * 0.5;
+                        var v1 = (p3 - p1) * 0.5;
+                        var t2 = t * t;
+                        var t3 = t * t2;
+
+                        return (2 * p1 - 2 * p2 + v0 + v1) * t3 + (-3 * p1 + 3 * p2 - 2 * v0 - v1) * t2 + v0 * t + p1;
+                }
+
         }
 
-        // console.log(data);
-        if (options.bigData) {
-            context.save();
-            context.beginPath();
-
-            for (var i = 0, len = data.length; i < len; i++) {
-
-                var item = data[i];
-
-                pathSimple.draw(context, item, options);
-            }
-
-            var type = options.bigData;
-
-            if (type == 'Point' || type == 'Polygon' || type == 'MultiPolygon') {
-
-                context.fill();
-
-                if (context.lineDash) {
-                    context.setLineDash(context.lineDash);
-                }
-
-                if (item.lineDash) {
-                    context.setLineDash(item.lineDash);
-                }
-
-                if ((item.strokeStyle || options.strokeStyle) && options.lineWidth) {
-                    context.stroke();
-                }
-            } else if (type == 'LineString' || type == 'MultiLineString') {
-                context.stroke();
-            }
-
-            context.restore();
-        } else {
-
-            for (var i = 0, len = data.length; i < len; i++) {
-
-                var item = data[i];
-
-                context.save();
-
-                if (item.fillStyle || item._fillStyle) {
-                    context.fillStyle = item.fillStyle || item._fillStyle;
-                }
-
-                if (item.strokeStyle || item._strokeStyle) {
-                    context.strokeStyle = item.strokeStyle || item._strokeStyle;
-                }
-
-                if (context.lineDash) {
-                    context.setLineDash(context.lineDash);
-                }
-
-                if (item.lineDash) {
-                    context.setLineDash(item.lineDash);
-                }
-
-                var type = item.geometry.type;
-
-                context.beginPath();
-
-                options.multiPolygonDraw = function () {
-                    context.fill();
-
-                    if ((item.strokeStyle || options.strokeStyle) && options.lineWidth) {
-                        context.stroke();
-                    }
-                };
-                pathSimple.draw(context, item, options);
-
-                if (type == 'Point' || type == 'Polygon' || type == 'MultiPolygon') {
-
-                    context.fill();
-
-                    if ((item.strokeStyle || options.strokeStyle) && options.lineWidth) {
-                        context.stroke();
-                    }
-                } else if (type == 'LineString' || type == 'MultiLineString') {
-                    if (item.lineWidth || item._lineWidth) {
-                        context.lineWidth = item.lineWidth || item._lineWidth;
-                    }
-                    context.stroke();
-                }
-
-                context.restore();
-            }
-        }
-
-        context.restore();
-    }
 };
 
 function Canvas(width, height) {
@@ -1020,6 +1554,273 @@ Intensity.prototype.getLegend = function (options) {
     return canvas;
 };
 
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+/**
+ * Category
+ * @param {Object} splitList:
+ *   { 
+ *       other: 1,
+ *       1: 2,
+ *       2: 3,
+ *       3: 4,
+ *       4: 5,
+ *       5: 6,
+ *       6: 7
+ *   }
+ */
+function Category(splitList) {
+    this.splitList = splitList || {
+        other: 1
+    };
+}
+
+Category.prototype.get = function (count) {
+
+    var splitList = this.splitList;
+
+    var value = splitList['other'];
+
+    for (var i in splitList) {
+        if (count == i) {
+            value = splitList[i];
+            break;
+        }
+    }
+
+    return value;
+};
+
+/**
+ * 根据DataSet自动生成对应的splitList
+ */
+Category.prototype.generateByDataSet = function (dataSet, color) {
+    var colors = color || ['rgba(255, 255, 0, 0.8)', 'rgba(253, 98, 104, 0.8)', 'rgba(255, 146, 149, 0.8)', 'rgba(255, 241, 193, 0.8)', 'rgba(110, 176, 253, 0.8)', 'rgba(52, 139, 251, 0.8)', 'rgba(17, 102, 252, 0.8)'];
+    var data = dataSet.get();
+    this.splitList = {};
+    var count = 0;
+    for (var i = 0; i < data.length; i++) {
+        if (this.splitList[data[i].count] === undefined) {
+            this.splitList[data[i].count] = colors[count];
+            count++;
+        }
+        if (count >= colors.length - 1) {
+            break;
+        }
+    }
+
+    this.splitList['other'] = colors[colors.length - 1];
+};
+
+Category.prototype.getLegend = function (options) {
+    var splitList = this.splitList;
+    var container = document.createElement('div');
+    container.style.cssText = "background:#fff; padding: 5px; border: 1px solid #ccc;";
+    var html = '';
+    for (var key in splitList) {
+        html += '<div style="line-height: 19px;" value="' + key + '"><span style="vertical-align: -2px; display: inline-block; width: 30px;height: 19px;background:' + splitList[key] + ';"></span><span style="margin-left: 3px;">' + key + '<span></div>';
+    }
+    container.innerHTML = html;
+    return container;
+};
+
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+/**
+ * Choropleth
+ * @param {Object} splitList:
+ *       [
+ *           {
+ *               start: 0,
+ *               end: 2,
+ *               value: randomColor()
+ *           },{
+ *               start: 2,
+ *               end: 4,
+ *               value: randomColor()
+ *           },{
+ *               start: 4,
+ *               value: randomColor()
+ *           }
+ *       ];
+ *
+ */
+function Choropleth(splitList) {
+    this.splitList = splitList || [{
+        start: 0,
+        value: 'red'
+    }];
+}
+
+Choropleth.prototype.get = function (count) {
+    var splitList = this.splitList;
+
+    var value = false;
+
+    for (var i = 0; i < splitList.length; i++) {
+        if ((splitList[i].start === undefined || splitList[i].start !== undefined && count >= splitList[i].start) && (splitList[i].end === undefined || splitList[i].end !== undefined && count < splitList[i].end)) {
+            value = splitList[i].value;
+            break;
+        }
+    }
+
+    return value;
+};
+
+/**
+ * 根据DataSet自动生成对应的splitList
+ */
+Choropleth.prototype.generateByDataSet = function (dataSet) {
+
+    var min = dataSet.getMin('count');
+    var max = dataSet.getMax('count');
+
+    this.generateByMinMax(min, max);
+};
+
+/**
+ * 根据DataSet自动生成对应的splitList
+ */
+Choropleth.prototype.generateByMinMax = function (min, max) {
+    var colors = ['rgba(255, 255, 0, 0.8)', 'rgba(253, 98, 104, 0.8)', 'rgba(255, 146, 149, 0.8)', 'rgba(255, 241, 193, 0.8)', 'rgba(110, 176, 253, 0.8)', 'rgba(52, 139, 251, 0.8)', 'rgba(17, 102, 252, 0.8)'];
+    var splitNum = Number((max - min) / 7);
+    // console.log(splitNum)
+    max = Number(max);
+    var index = Number(min);
+    this.splitList = [];
+    var count = 0;
+
+    while (index < max) {
+        this.splitList.push({
+            start: index,
+            end: index + splitNum,
+            value: colors[count]
+        });
+        count++;
+        index += splitNum;
+        // console.log(index, max)
+    }
+    // console.log('splitNum')
+};
+
+Choropleth.prototype.getLegend = function (options) {
+    var splitList = this.splitList;
+};
+
+function hex_corner(center, size, i) {
+    var angle_deg = 60 * i + 30;
+    var angle_rad = Math.PI / 180 * angle_deg;
+    return [center.x + size * Math.cos(angle_rad), center.y + size * Math.sin(angle_rad)];
+}
+
+function draw$1(context, x, y, size) {
+
+    for (var j = 0; j < 6; j++) {
+
+        var result = hex_corner({
+            x: x,
+            y: y
+        }, size, j);
+
+        context.lineTo(result[0], result[1]);
+    }
+}
+
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+var pathSimple = {
+    drawDataSet: function drawDataSet(context, dataSet, options) {
+
+        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+
+        for (var i = 0, len = data.length; i < len; i++) {
+            var item = data[i];
+            this.draw(context, item, options);
+        }
+    },
+    draw: function draw$$1(context, data, options) {
+        var type = data.geometry.type;
+        var coordinates = data.geometry._coordinates || data.geometry.coordinates;
+        var symbol = data.symbol || options.symbol || 'circle';
+        switch (type) {
+            case 'Point':
+                var size = data._size || data.size || options._size || options.size || 5;
+                if (symbol === 'circle') {
+                    if (options.bigData === 'Point') {
+                        context.moveTo(coordinates[0], coordinates[1]);
+                    }
+                    context.arc(coordinates[0], coordinates[1], size, 0, Math.PI * 2);
+                } else if (symbol === 'rect') {
+                    context.rect(coordinates[0] - size / 2, coordinates[1] - size / 2, size, size);
+                } else if (symbol === 'honeycomb') {
+                    draw$1(context, coordinates[0], coordinates[1], size);
+                }
+                break;
+            case 'LineString':
+                this.drawLineString(context, coordinates);
+                break;
+            case 'MultiLineString':
+                for (var i = 0; i < coordinates.length; i++) {
+                    var lineString = coordinates[i];
+                    this.drawLineString(context, lineString);
+                }
+                break;
+            case 'Polygon':
+                this.drawPolygon(context, coordinates);
+                break;
+            case 'MultiPolygon':
+                for (var i = 0; i < coordinates.length; i++) {
+                    var polygon = coordinates[i];
+                    this.drawPolygon(context, polygon);
+                    if (options.multiPolygonDraw) {
+                        var flag = options.multiPolygonDraw();
+                        if (flag) {
+                            return flag;
+                        }
+                    }
+                }
+                break;
+            default:
+                console.error('type' + type + 'is not support now!');
+                break;
+        }
+    },
+
+    drawLineString: function drawLineString(context, coordinates) {
+        for (var j = 0; j < coordinates.length; j++) {
+            var x = coordinates[j][0];
+            var y = coordinates[j][1];
+            if (j == 0) {
+                context.moveTo(x, y);
+            } else {
+                context.lineTo(x, y);
+            }
+        }
+    },
+
+    drawPolygon: function drawPolygon(context, coordinates) {
+        context.beginPath();
+
+        for (var i = 0; i < coordinates.length; i++) {
+            var coordinate = coordinates[i];
+
+            context.moveTo(coordinate[0][0], coordinate[0][1]);
+            for (var j = 1; j < coordinate.length; j++) {
+                context.lineTo(coordinate[j][0], coordinate[j][1]);
+            }
+            context.lineTo(coordinate[0][0], coordinate[0][1]);
+            context.closePath();
+        }
+    }
+
+};
+
 var global$1 = typeof window === 'undefined' ? {} : window;
 
 var devicePixelRatio = global$1.devicePixelRatio || 1;
@@ -1162,7 +1963,7 @@ function drawGray(context, dataSet, options) {
     }
 }
 
-function draw$1(context, dataSet, options) {
+function draw(context, dataSet, options) {
     if (context.canvas.width <= 0 || context.canvas.height <= 0) {
         return;
     }
@@ -1204,244 +2005,271 @@ function draw$1(context, dataSet, options) {
 }
 
 var drawHeatmap = {
-    draw: draw$1
+    draw: draw
 };
 
 /**
- * @author kyle / http://nikai.us/
+ * 根据2点获取角度
+ * @param Array [123, 23] 点1
+ * @param Array [123, 23] 点2
+ * @return angle 角度,不是弧度
  */
-
-var drawGrid = {
-    draw: function draw(context, dataSet, options) {
-
-        context.save();
-
-        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
-
-        var grids = {};
-
-        var size = options._size || options.size || 50;
-
-        // 后端传入数据为网格数据时，传入enableCluster为false，前端不进行删格化操作，直接画方格	
-        var enableCluster = 'enableCluster' in options ? options.enableCluster : true;
-
-        var offset = options.offset || {
-            x: 0,
-            y: 0
-        };
-
-        var intensity = new Intensity({
-            min: options.min || 0,
-            max: options.max || 100,
-            gradient: options.gradient
-        });
-
-        if (!enableCluster) {
-            for (var i = 0; i < data.length; i++) {
-                var coordinates = data[i].geometry._coordinates || data[i].geometry.coordinates;
-                var gridKey = coordinates.join(',');
-                grids[gridKey] = data[i].count || 1;
-            }
-            for (var _gridKey in grids) {
-                _gridKey = _gridKey.split(',');
-
-                context.beginPath();
-                context.rect(+_gridKey[0] - size / 2, +_gridKey[1] - size / 2, size, size);
-                context.fillStyle = intensity.getColor(grids[_gridKey]);
-                context.fill();
-                if (options.strokeStyle && options.lineWidth) {
-                    context.stroke();
-                }
-            }
-        } else {
-            for (var _i = 0; _i < data.length; _i++) {
-                var coordinates = data[_i].geometry._coordinates || data[_i].geometry.coordinates;
-                var gridKey = Math.floor((coordinates[0] - offset.x) / size) + ',' + Math.floor((coordinates[1] - offset.y) / size);
-                if (!grids[gridKey]) {
-                    grids[gridKey] = 0;
-                }
-
-                grids[gridKey] += ~~(data[_i].count || 1);
-            }
-
-            for (var _gridKey2 in grids) {
-                _gridKey2 = _gridKey2.split(',');
-
-                context.beginPath();
-                context.rect(_gridKey2[0] * size + .5 + offset.x, _gridKey2[1] * size + .5 + offset.y, size, size);
-                context.fillStyle = intensity.getColor(grids[_gridKey2]);
-                context.fill();
-                if (options.strokeStyle && options.lineWidth) {
-                    context.stroke();
-                }
-            }
-        }
-
-        if (options.label && options.label.show !== false) {
-
-            context.fillStyle = options.label.fillStyle || 'white';
-
-            if (options.label.font) {
-                context.font = options.label.font;
-            }
-
-            if (options.label.shadowColor) {
-                context.shadowColor = options.label.shadowColor;
-            }
-
-            if (options.label.shadowBlur) {
-                context.shadowBlur = options.label.shadowBlur;
-            }
-
-            for (var gridKey in grids) {
-                gridKey = gridKey.split(',');
-                var text = grids[gridKey];
-                var textWidth = context.measureText(text).width;
-                if (!enableCluster) {
-                    context.fillText(text, +gridKey[0] - textWidth / 2, +gridKey[1] + 5);
-                } else {
-                    context.fillText(text, gridKey[0] * size + .5 + offset.x + size / 2 - textWidth / 2, gridKey[1] * size + .5 + offset.y + size / 2 + 5);
-                }
-            }
-        }
-
-        context.restore();
+function getAngle(start, end) {
+    var diff_x = end[0] - start[0];
+    var diff_y = end[1] - start[1];
+    var deg = 360 * Math.atan(diff_y / diff_x) / (2 * Math.PI);
+    if (end[0] < start[0]) {
+        deg = deg + 180;
     }
-};
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-function hex_corner$1(center, size, i) {
-    var angle_deg = 60 * i + 30;
-    var angle_rad = Math.PI / 180 * angle_deg;
-    return [center.x + size * Math.cos(angle_rad), center.y + size * Math.sin(angle_rad)];
+    return deg;
 }
 
-var drawHoneycomb = {
-    draw: function draw(context, dataSet, options) {
+/**
+ * 绘制沿线箭头
+ * @author kyle / http://nikai.us/
+ */
 
-        context.save();
+var imageCache = {};
+
+var object = {
+    draw: function draw(context, dataSet, options) {
+        var imageCacheKey = 'http://huiyan.baidu.com/github/tools/gis-drawing/static/images/direction.png';
+        if (options.arrow && options.arrow.url) {
+            imageCacheKey = options.arrow.url;
+        }
+
+        if (!imageCache[imageCacheKey]) {
+            imageCache[imageCacheKey] = null;
+        }
+
+        var directionImage = imageCache[imageCacheKey];
+
+        if (!directionImage) {
+            var args = Array.prototype.slice.call(arguments);
+            var image = new Image();
+            image.onload = function () {
+                imageCache[imageCacheKey] = image;
+                object.draw.apply(null, args);
+            };
+            image.src = imageCacheKey;
+            return;
+        }
 
         var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+
+        // console.log('xxxx',options)
+        context.save();
 
         for (var key in options) {
             context[key] = options[key];
         }
 
-        var grids = {};
+        var points = [];
+        var preCoordinate = null;
+        for (var i = 0, len = data.length; i < len; i++) {
 
-        var offset = options.offset || {
-            x: 10,
-            y: 10
-        };
+            var item = data[i];
 
-        var r = options._size || options.size || 40;
-        r = r / 2 / Math.sin(Math.PI / 3);
-        var dx = r * 2 * Math.sin(Math.PI / 3);
-        var dy = r * 1.5;
+            context.save();
 
-        var binsById = {};
-
-        for (var i = 0; i < data.length; i++) {
-            var coordinates = data[i].geometry._coordinates || data[i].geometry.coordinates;
-            var py = (coordinates[1] - offset.y) / dy,
-                pj = Math.round(py),
-                px = (coordinates[0] - offset.x) / dx - (pj & 1 ? .5 : 0),
-                pi = Math.round(px),
-                py1 = py - pj;
-
-            if (Math.abs(py1) * 3 > 1) {
-                var px1 = px - pi,
-                    pi2 = pi + (px < pi ? -1 : 1) / 2,
-                    pj2 = pj + (py < pj ? -1 : 1),
-                    px2 = px - pi2,
-                    py2 = py - pj2;
-                if (px1 * px1 + py1 * py1 > px2 * px2 + py2 * py2) pi = pi2 + (pj & 1 ? 1 : -1) / 2, pj = pj2;
+            if (item.fillStyle || item._fillStyle) {
+                context.fillStyle = item.fillStyle || item._fillStyle;
             }
 
-            var id = pi + "-" + pj,
-                bin = binsById[id];
-            if (bin) {
-                bin.push(data[i]);
-            } else {
-                bin = binsById[id] = [data[i]];
-                bin.i = pi;
-                bin.j = pj;
-                bin.x = (pi + (pj & 1 ? 1 / 2 : 0)) * dx;
-                bin.y = pj * dy;
+            if (item.strokeStyle || item._strokeStyle) {
+                context.strokeStyle = item.strokeStyle || item._strokeStyle;
             }
-        }
 
-        var intensity = new Intensity({
-            max: options.max || 100,
-            maxSize: r,
-            gradient: options.gradient
-        });
-
-        for (var key in binsById) {
-
-            var item = binsById[key];
+            var type = item.geometry.type;
 
             context.beginPath();
+            if (type === 'LineString') {
+                var coordinates = item.geometry._coordinates || item.geometry.coordinates;
+                var interval = options.arrow.interval !== undefined ? options.arrow.interval : 1;
+                for (var j = 0; j < coordinates.length; j += interval) {
+                    if (coordinates[j] && coordinates[j + 1]) {
+                        var coordinate = coordinates[j];
 
-            for (var j = 0; j < 6; j++) {
+                        if (preCoordinate && getDistance(coordinate, preCoordinate) < 30) {
+                            continue;
+                        }
 
-                var result = hex_corner$1({
-                    x: item.x + offset.x,
-                    y: item.y + offset.y
-                }, r, j);
+                        context.save();
+                        var angle = getAngle(coordinates[j], coordinates[j + 1]);
+                        context.translate(coordinate[0], coordinate[1]);
+                        context.rotate(angle * Math.PI / 180);
+                        context.drawImage(directionImage, -directionImage.width / 2 / 2, -directionImage.height / 2 / 2, directionImage.width / 2, directionImage.height / 2);
+                        context.restore();
 
-                context.lineTo(result[0], result[1]);
+                        points.push(coordinate);
+                        preCoordinate = coordinate;
+                    }
+                }
             }
 
-            context.closePath();
-
-            var count = 0;
-            for (var i = 0; i < item.length; i++) {
-                count += item[i].count || 1;
-            }
-            item.count = count;
-
-            context.fillStyle = intensity.getColor(count);
-            context.fill();
-            if (options.strokeStyle && options.lineWidth) {
-                context.stroke();
-            }
+            context.restore();
         }
 
-        if (options.label && options.label.show !== false) {
+        context.restore();
+    }
+};
 
-            context.fillStyle = options.label.fillStyle || 'white';
+function getDistance(coordinateA, coordinateB) {
+    return Math.sqrt(Math.pow(coordinateA[0] - coordinateB[0], 2) + Math.pow(coordinateA[1] - coordinateB[1], 2));
+}
 
-            if (options.label.font) {
-                context.font = options.label.font;
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+var drawSimple = {
+    draw: function draw(context, dataSet, options) {
+
+        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+
+        // console.log('xxxx',options)
+        context.save();
+
+        for (var key in options) {
+            context[key] = options[key];
+        }
+
+        // console.log(data);
+        if (options.bigData) {
+            context.save();
+            context.beginPath();
+
+            for (var i = 0, len = data.length; i < len; i++) {
+
+                var item = data[i];
+
+                pathSimple.draw(context, item, options);
             }
 
-            if (options.label.shadowColor) {
-                context.shadowColor = options.label.shadowColor;
-            }
+            var type = options.bigData;
 
-            if (options.label.shadowBlur) {
-                context.shadowBlur = options.label.shadowBlur;
-            }
+            if (type == 'Point' || type == 'Polygon' || type == 'MultiPolygon') {
 
-            for (var key in binsById) {
-                var item = binsById[key];
-                var text = item.count;
-                if (text < 0) {
-                    text = text.toFixed(2);
-                } else {
-                    text = ~~text;
+                context.fill();
+
+                if (context.lineDash) {
+                    context.setLineDash(context.lineDash);
                 }
-                var textWidth = context.measureText(text).width;
-                context.fillText(text, item.x + offset.x - textWidth / 2, item.y + offset.y + 5);
+
+                if (item.lineDash) {
+                    context.setLineDash(item.lineDash);
+                }
+
+                if ((item.strokeStyle || options.strokeStyle) && options.lineWidth) {
+                    context.stroke();
+                }
+            } else if (type == 'LineString' || type == 'MultiLineString') {
+                context.stroke();
+            }
+
+            context.restore();
+        } else {
+
+            for (var i = 0, len = data.length; i < len; i++) {
+
+                var item = data[i];
+
+                context.save();
+
+                if (item.fillStyle || item._fillStyle) {
+                    context.fillStyle = item.fillStyle || item._fillStyle;
+                }
+
+                if (item.strokeStyle || item._strokeStyle) {
+                    context.strokeStyle = item.strokeStyle || item._strokeStyle;
+                }
+
+                if (context.lineDash) {
+                    context.setLineDash(context.lineDash);
+                }
+
+                if (item.lineDash) {
+                    context.setLineDash(item.lineDash);
+                }
+
+                var type = item.geometry.type;
+
+                context.beginPath();
+
+                options.multiPolygonDraw = function () {
+                    context.fill();
+
+                    if ((item.strokeStyle || options.strokeStyle) && options.lineWidth) {
+                        context.stroke();
+                    }
+                };
+                pathSimple.draw(context, item, options);
+
+                if (type == 'Point' || type == 'Polygon' || type == 'MultiPolygon') {
+
+                    context.fill();
+
+                    if ((item.strokeStyle || options.strokeStyle) && options.lineWidth) {
+                        context.stroke();
+                    }
+                } else if (type == 'LineString' || type == 'MultiLineString') {
+                    if (item.lineWidth || item._lineWidth) {
+                        context.lineWidth = item.lineWidth || item._lineWidth;
+                    }
+                    context.stroke();
+                }
+
+                context.restore();
             }
         }
 
         context.restore();
     }
+};
+
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+var clear = function (context) {
+    context && context.clearRect && context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+    //context.canvas.width = context.canvas.width;
+    //context.canvas.height = context.canvas.height;
+};
+
+/**
+ * @author Mofei Zhu<mapv@zhuwenlong.com>
+ * This file is to draw text
+ */
+
+var drawClip = {
+        draw: function draw(context, dataSet, options) {
+                var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+                context.save();
+
+                context.fillStyle = options.fillStyle || 'rgba(0, 0, 0, 0.5)';
+                context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+
+                options.multiPolygonDraw = function () {
+                        context.save();
+                        context.clip();
+                        clear(context);
+                        context.restore();
+                };
+
+                for (var i = 0, len = data.length; i < len; i++) {
+
+                        context.beginPath();
+
+                        pathSimple.drawDataSet(context, [data[i]], options);
+                        context.save();
+                        context.clip();
+                        clear(context);
+                        context.restore();
+                }
+
+                context.restore();
+        }
 };
 
 function createShader(gl, src, type) {
@@ -2354,1768 +3182,101 @@ var webglDrawSimple = {
 };
 
 /**
-  * 根据弧线的坐标节点数组
-  */
-function getCurvePoints(points, options) {
-  options = options || {};
-  var curvePoints = [];
-  for (var i = 0; i < points.length - 1; i++) {
-    var p = getCurveByTwoPoints(points[i], points[i + 1], options.count);
-    if (p && p.length > 0) {
-      curvePoints = curvePoints.concat(p);
-    }
-  }
-  return curvePoints;
-}
-
-/**
- * 根据两点获取曲线坐标点数组
- * @param Point 起点
- * @param Point 终点
- */
-function getCurveByTwoPoints(obj1, obj2, count) {
-  if (!obj1 || !obj2) {
-    return null;
-  }
-
-  var B1 = function B1(x) {
-    return 1 - 2 * x + x * x;
-  };
-  var B2 = function B2(x) {
-    return 2 * x - 2 * x * x;
-  };
-  var B3 = function B3(x) {
-    return x * x;
-  };
-
-  var curveCoordinates = [];
-
-  var count = count || 40; // 曲线是由一些小的线段组成的，这个表示这个曲线所有到的折线的个数
-  var isFuture = false;
-  var t, h, h2, lat3, lng3, j, t2;
-  var LnArray = [];
-  var i = 0;
-  var inc = 0;
-
-  if (typeof obj2 == "undefined") {
-    if (typeof curveCoordinates != "undefined") {
-      curveCoordinates = [];
-    }
-    return;
-  }
-
-  var lat1 = parseFloat(obj1.lat);
-  var lat2 = parseFloat(obj2.lat);
-  var lng1 = parseFloat(obj1.lng);
-  var lng2 = parseFloat(obj2.lng);
-
-  // 计算曲线角度的方法
-  if (lng2 > lng1) {
-    if (parseFloat(lng2 - lng1) > 180) {
-      if (lng1 < 0) {
-        lng1 = parseFloat(180 + 180 + lng1);
-        lng2 = parseFloat(180 + 180 + lng2);
-      }
-    }
-  }
-  // 此时纠正了 lng1 lng2
-  j = 0;
-  t2 = 0;
-  // 纬度相同
-  if (lat2 == lat1) {
-    t = 0;
-    h = lng1 - lng2;
-    // 经度相同
-  } else if (lng2 == lng1) {
-    t = Math.PI / 2;
-    h = lat1 - lat2;
-  } else {
-    t = Math.atan((lat2 - lat1) / (lng2 - lng1));
-    h = (lat2 - lat1) / Math.sin(t);
-  }
-  if (t2 == 0) {
-    t2 = t + Math.PI / 5;
-  }
-  h2 = h / 2;
-  lng3 = h2 * Math.cos(t2) + lng1;
-  lat3 = h2 * Math.sin(t2) + lat1;
-
-  for (i = 0; i < count + 1; i++) {
-    var x = lng1 * B1(inc) + lng3 * B2(inc) + lng2 * B3(inc);
-    var y = lat1 * B1(inc) + lat3 * B2(inc) + lat2 * B3(inc);
-    var lng1_src = obj1.lng;
-    var lng2_src = obj2.lng;
-
-    curveCoordinates.push([lng1_src < 0 && lng2_src > 0 ? x - 360 : x, y]);
-    inc = inc + 1 / count;
-  }
-  return curveCoordinates;
-}
-
-var curve = {
-  getPoints: getCurvePoints
-};
-
-/* 
-FDEB algorithm implementation [www.win.tue.nl/~dholten/papers/forcebundles_eurovis.pdf].
-
-Author:  (github.com/upphiminn)
-2013
-
-*/
-
-var ForceEdgeBundling = function ForceEdgeBundling() {
-    var data_nodes = {},
-        // {'nodeid':{'x':,'y':},..}
-    data_edges = [],
-        // [{'source':'nodeid1', 'target':'nodeid2'},..]
-    compatibility_list_for_edge = [],
-        subdivision_points_for_edge = [],
-        K = 0.1,
-        // global bundling constant controling edge stiffness
-    S_initial = 0.1,
-        // init. distance to move points
-    P_initial = 1,
-        // init. subdivision number
-    P_rate = 2,
-        // subdivision rate increase
-    C = 6,
-        // number of cycles to perform
-    I_initial = 70,
-        // init. number of iterations for cycle
-    I_rate = 0.6666667,
-        // rate at which iteration number decreases i.e. 2/3
-    compatibility_threshold = 0.6,
-        invers_quadratic_mode = false,
-        eps = 1e-8;
-
-    /*** Geometry Helper Methods ***/
-    function vector_dot_product(p, q) {
-        return p.x * q.x + p.y * q.y;
-    }
-
-    function edge_as_vector(P) {
-        return { 'x': data_nodes[P.target].x - data_nodes[P.source].x,
-            'y': data_nodes[P.target].y - data_nodes[P.source].y };
-    }
-
-    function edge_length(e) {
-        return Math.sqrt(Math.pow(data_nodes[e.source].x - data_nodes[e.target].x, 2) + Math.pow(data_nodes[e.source].y - data_nodes[e.target].y, 2));
-    }
-
-    function custom_edge_length(e) {
-        return Math.sqrt(Math.pow(e.source.x - e.target.x, 2) + Math.pow(e.source.y - e.target.y, 2));
-    }
-
-    function edge_midpoint(e) {
-        var middle_x = (data_nodes[e.source].x + data_nodes[e.target].x) / 2.0;
-        var middle_y = (data_nodes[e.source].y + data_nodes[e.target].y) / 2.0;
-        return { 'x': middle_x, 'y': middle_y };
-    }
-
-    function compute_divided_edge_length(e_idx) {
-        var length = 0;
-        for (var i = 1; i < subdivision_points_for_edge[e_idx].length; i++) {
-            var segment_length = euclidean_distance(subdivision_points_for_edge[e_idx][i], subdivision_points_for_edge[e_idx][i - 1]);
-            length += segment_length;
-        }
-        return length;
-    }
-
-    function euclidean_distance(p, q) {
-        return Math.sqrt(Math.pow(p.x - q.x, 2) + Math.pow(p.y - q.y, 2));
-    }
-
-    function project_point_on_line(p, Q) {
-        var L = Math.sqrt((Q.target.x - Q.source.x) * (Q.target.x - Q.source.x) + (Q.target.y - Q.source.y) * (Q.target.y - Q.source.y));
-        var r = ((Q.source.y - p.y) * (Q.source.y - Q.target.y) - (Q.source.x - p.x) * (Q.target.x - Q.source.x)) / (L * L);
-
-        return { 'x': Q.source.x + r * (Q.target.x - Q.source.x), 'y': Q.source.y + r * (Q.target.y - Q.source.y) };
-    }
-
-    /*** ********************** ***/
-
-    /*** Initialization Methods ***/
-    function initialize_edge_subdivisions() {
-        for (var i = 0; i < data_edges.length; i++) {
-            if (P_initial == 1) subdivision_points_for_edge[i] = []; //0 subdivisions
-            else {
-                    subdivision_points_for_edge[i] = [];
-                    subdivision_points_for_edge[i].push(data_nodes[data_edges[i].source]);
-                    subdivision_points_for_edge[i].push(data_nodes[data_edges[i].target]);
-                }
-        }
-    }
-
-    function initialize_compatibility_lists() {
-        for (var i = 0; i < data_edges.length; i++) {
-            compatibility_list_for_edge[i] = [];
-        } //0 compatible edges.
-    }
-
-    function filter_self_loops(edgelist) {
-        var filtered_edge_list = [];
-        for (var e = 0; e < edgelist.length; e++) {
-            if (data_nodes[edgelist[e].source].x != data_nodes[edgelist[e].target].x && data_nodes[edgelist[e].source].y != data_nodes[edgelist[e].target].y) {
-                //or smaller than eps
-                filtered_edge_list.push(edgelist[e]);
-            }
-        }
-
-        return filtered_edge_list;
-    }
-    /*** ********************** ***/
-
-    /*** Force Calculation Methods ***/
-    function apply_spring_force(e_idx, i, kP) {
-
-        var prev = subdivision_points_for_edge[e_idx][i - 1];
-        var next = subdivision_points_for_edge[e_idx][i + 1];
-        var crnt = subdivision_points_for_edge[e_idx][i];
-
-        var x = prev.x - crnt.x + next.x - crnt.x;
-        var y = prev.y - crnt.y + next.y - crnt.y;
-
-        x *= kP;
-        y *= kP;
-
-        return { 'x': x, 'y': y };
-    }
-
-    function apply_electrostatic_force(e_idx, i, S) {
-        var sum_of_forces = { 'x': 0, 'y': 0 };
-        var compatible_edges_list = compatibility_list_for_edge[e_idx];
-
-        for (var oe = 0; oe < compatible_edges_list.length; oe++) {
-            var force = { 'x': subdivision_points_for_edge[compatible_edges_list[oe]][i].x - subdivision_points_for_edge[e_idx][i].x,
-                'y': subdivision_points_for_edge[compatible_edges_list[oe]][i].y - subdivision_points_for_edge[e_idx][i].y };
-
-            if (Math.abs(force.x) > eps || Math.abs(force.y) > eps) {
-
-                var diff = 1 / Math.pow(custom_edge_length({ 'source': subdivision_points_for_edge[compatible_edges_list[oe]][i],
-                    'target': subdivision_points_for_edge[e_idx][i] }), 1);
-
-                sum_of_forces.x += force.x * diff;
-                sum_of_forces.y += force.y * diff;
-            }
-        }
-        return sum_of_forces;
-    }
-
-    function apply_resulting_forces_on_subdivision_points(e_idx, P, S) {
-        var kP = K / (edge_length(data_edges[e_idx]) * (P + 1)); // kP=K/|P|(number of segments), where |P| is the initial length of edge P.
-        // (length * (num of sub division pts - 1))
-        var resulting_forces_for_subdivision_points = [{ 'x': 0, 'y': 0 }];
-        for (var i = 1; i < P + 1; i++) {
-            // exclude initial end points of the edge 0 and P+1
-            var resulting_force = { 'x': 0, 'y': 0 };
-
-            var spring_force = apply_spring_force(e_idx, i, kP);
-            var electrostatic_force = apply_electrostatic_force(e_idx, i, S);
-
-            resulting_force.x = S * (spring_force.x + electrostatic_force.x);
-            resulting_force.y = S * (spring_force.y + electrostatic_force.y);
-
-            resulting_forces_for_subdivision_points.push(resulting_force);
-        }
-        resulting_forces_for_subdivision_points.push({ 'x': 0, 'y': 0 });
-        return resulting_forces_for_subdivision_points;
-    }
-    /*** ********************** ***/
-
-    /*** Edge Division Calculation Methods ***/
-    function update_edge_divisions(P) {
-        for (var e_idx = 0; e_idx < data_edges.length; e_idx++) {
-
-            if (P == 1) {
-                subdivision_points_for_edge[e_idx].push(data_nodes[data_edges[e_idx].source]); // source
-                subdivision_points_for_edge[e_idx].push(edge_midpoint(data_edges[e_idx])); // mid point
-                subdivision_points_for_edge[e_idx].push(data_nodes[data_edges[e_idx].target]); // target
-            } else {
-
-                var divided_edge_length = compute_divided_edge_length(e_idx);
-                var segment_length = divided_edge_length / (P + 1);
-                var current_segment_length = segment_length;
-                var new_subdivision_points = [];
-                new_subdivision_points.push(data_nodes[data_edges[e_idx].source]); //source
-
-                for (var i = 1; i < subdivision_points_for_edge[e_idx].length; i++) {
-                    var old_segment_length = euclidean_distance(subdivision_points_for_edge[e_idx][i], subdivision_points_for_edge[e_idx][i - 1]);
-
-                    while (old_segment_length > current_segment_length) {
-                        var percent_position = current_segment_length / old_segment_length;
-                        var new_subdivision_point_x = subdivision_points_for_edge[e_idx][i - 1].x;
-                        var new_subdivision_point_y = subdivision_points_for_edge[e_idx][i - 1].y;
-
-                        new_subdivision_point_x += percent_position * (subdivision_points_for_edge[e_idx][i].x - subdivision_points_for_edge[e_idx][i - 1].x);
-                        new_subdivision_point_y += percent_position * (subdivision_points_for_edge[e_idx][i].y - subdivision_points_for_edge[e_idx][i - 1].y);
-                        new_subdivision_points.push({ 'x': new_subdivision_point_x,
-                            'y': new_subdivision_point_y });
-
-                        old_segment_length -= current_segment_length;
-                        current_segment_length = segment_length;
-                    }
-                    current_segment_length -= old_segment_length;
-                }
-                new_subdivision_points.push(data_nodes[data_edges[e_idx].target]); //target
-                subdivision_points_for_edge[e_idx] = new_subdivision_points;
-            }
-        }
-    }
-    /*** ********************** ***/
-
-    /*** Edge compatibility measures ***/
-    function angle_compatibility(P, Q) {
-        var result = Math.abs(vector_dot_product(edge_as_vector(P), edge_as_vector(Q)) / (edge_length(P) * edge_length(Q)));
-        return result;
-    }
-
-    function scale_compatibility(P, Q) {
-        var lavg = (edge_length(P) + edge_length(Q)) / 2.0;
-        var result = 2.0 / (lavg / Math.min(edge_length(P), edge_length(Q)) + Math.max(edge_length(P), edge_length(Q)) / lavg);
-        return result;
-    }
-
-    function position_compatibility(P, Q) {
-        var lavg = (edge_length(P) + edge_length(Q)) / 2.0;
-        var midP = { 'x': (data_nodes[P.source].x + data_nodes[P.target].x) / 2.0,
-            'y': (data_nodes[P.source].y + data_nodes[P.target].y) / 2.0 };
-        var midQ = { 'x': (data_nodes[Q.source].x + data_nodes[Q.target].x) / 2.0,
-            'y': (data_nodes[Q.source].y + data_nodes[Q.target].y) / 2.0 };
-        var result = lavg / (lavg + euclidean_distance(midP, midQ));
-        return result;
-    }
-
-    function edge_visibility(P, Q) {
-        var I0 = project_point_on_line(data_nodes[Q.source], { 'source': data_nodes[P.source],
-            'target': data_nodes[P.target] });
-        var I1 = project_point_on_line(data_nodes[Q.target], { 'source': data_nodes[P.source],
-            'target': data_nodes[P.target] }); //send acutal edge points positions
-        var midI = { 'x': (I0.x + I1.x) / 2.0,
-            'y': (I0.y + I1.y) / 2.0 };
-        var midP = { 'x': (data_nodes[P.source].x + data_nodes[P.target].x) / 2.0,
-            'y': (data_nodes[P.source].y + data_nodes[P.target].y) / 2.0 };
-        var result = Math.max(0, 1 - 2 * euclidean_distance(midP, midI) / euclidean_distance(I0, I1));
-        return result;
-    }
-
-    function visibility_compatibility(P, Q) {
-        return Math.min(edge_visibility(P, Q), edge_visibility(Q, P));
-    }
-
-    function compatibility_score(P, Q) {
-        var result = angle_compatibility(P, Q) * scale_compatibility(P, Q) * position_compatibility(P, Q) * visibility_compatibility(P, Q);
-
-        return result;
-    }
-
-    function are_compatible(P, Q) {
-        // console.log('compatibility ' + P.source +' - '+ P.target + ' and ' + Q.source +' '+ Q.target);
-        return compatibility_score(P, Q) >= compatibility_threshold;
-    }
-
-    function compute_compatibility_lists() {
-        for (var e = 0; e < data_edges.length - 1; e++) {
-            for (var oe = e + 1; oe < data_edges.length; oe++) {
-                // don't want any duplicates
-                if (e == oe) continue;else {
-                    if (are_compatible(data_edges[e], data_edges[oe])) {
-                        compatibility_list_for_edge[e].push(oe);
-                        compatibility_list_for_edge[oe].push(e);
-                    }
-                }
-            }
-        }
-    }
-
-    /*** ************************ ***/
-
-    /*** Main Bundling Loop Methods ***/
-    var forcebundle = function forcebundle() {
-        var S = S_initial;
-        var I = I_initial;
-        var P = P_initial;
-
-        initialize_edge_subdivisions();
-        initialize_compatibility_lists();
-        update_edge_divisions(P);
-        compute_compatibility_lists();
-        for (var cycle = 0; cycle < C; cycle++) {
-            for (var iteration = 0; iteration < I; iteration++) {
-                var forces = [];
-                for (var edge = 0; edge < data_edges.length; edge++) {
-                    forces[edge] = apply_resulting_forces_on_subdivision_points(edge, P, S);
-                }
-                for (var e = 0; e < data_edges.length; e++) {
-                    for (var i = 0; i < P + 1; i++) {
-                        subdivision_points_for_edge[e][i].x += forces[e][i].x;
-                        subdivision_points_for_edge[e][i].y += forces[e][i].y;
-                    }
-                }
-            }
-            //prepare for next cycle
-            S = S / 2;
-            P = P * 2;
-            I = I_rate * I;
-
-            update_edge_divisions(P);
-            // console.log('C' + cycle);
-            // console.log('P' + P);
-            // console.log('S' + S);
-        }
-        return subdivision_points_for_edge;
-    };
-    /*** ************************ ***/
-
-    /*** Getters/Setters Methods ***/
-    forcebundle.nodes = function (nl) {
-        if (arguments.length == 0) {
-            return data_nodes;
-        } else {
-            data_nodes = nl;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.edges = function (ll) {
-        if (arguments.length == 0) {
-            return data_edges;
-        } else {
-            data_edges = filter_self_loops(ll); //remove edges to from to the same point
-        }
-        return forcebundle;
-    };
-
-    forcebundle.bundling_stiffness = function (k) {
-        if (arguments.length == 0) {
-            return K;
-        } else {
-            K = k;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.step_size = function (step) {
-        if (arguments.length == 0) {
-            return S_initial;
-        } else {
-            S_initial = step;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.cycles = function (c) {
-        if (arguments.length == 0) {
-            return C;
-        } else {
-            C = c;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.iterations = function (i) {
-        if (arguments.length == 0) {
-            return I_initial;
-        } else {
-            I_initial = i;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.iterations_rate = function (i) {
-        if (arguments.length == 0) {
-            return I_rate;
-        } else {
-            I_rate = i;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.subdivision_points_seed = function (p) {
-        if (arguments.length == 0) {
-            return P;
-        } else {
-            P = p;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.subdivision_rate = function (r) {
-        if (arguments.length == 0) {
-            return P_rate;
-        } else {
-            P_rate = r;
-        }
-        return forcebundle;
-    };
-
-    forcebundle.compatbility_threshold = function (t) {
-        if (arguments.length == 0) {
-            return compatbility_threshold;
-        } else {
-            compatibility_threshold = t;
-        }
-        return forcebundle;
-    };
-
-    /*** ************************ ***/
-
-    return forcebundle;
-};
-
-/**
  * @author kyle / http://nikai.us/
  */
 
-/**
- * Category
- * @param {Object} splitList:
- *   { 
- *       other: 1,
- *       1: 2,
- *       2: 3,
- *       3: 4,
- *       4: 5,
- *       5: 6,
- *       6: 7
- *   }
- */
-function Category(splitList) {
-    this.splitList = splitList || {
-        other: 1
-    };
-}
-
-Category.prototype.get = function (count) {
-
-    var splitList = this.splitList;
-
-    var value = splitList['other'];
-
-    for (var i in splitList) {
-        if (count == i) {
-            value = splitList[i];
-            break;
-        }
-    }
-
-    return value;
-};
-
-/**
- * 根据DataSet自动生成对应的splitList
- */
-Category.prototype.generateByDataSet = function (dataSet, color) {
-    var colors = color || ['rgba(255, 255, 0, 0.8)', 'rgba(253, 98, 104, 0.8)', 'rgba(255, 146, 149, 0.8)', 'rgba(255, 241, 193, 0.8)', 'rgba(110, 176, 253, 0.8)', 'rgba(52, 139, 251, 0.8)', 'rgba(17, 102, 252, 0.8)'];
-    var data = dataSet.get();
-    this.splitList = {};
-    var count = 0;
-    for (var i = 0; i < data.length; i++) {
-        if (this.splitList[data[i].count] === undefined) {
-            this.splitList[data[i].count] = colors[count];
-            count++;
-        }
-        if (count >= colors.length - 1) {
-            break;
-        }
-    }
-
-    this.splitList['other'] = colors[colors.length - 1];
-};
-
-Category.prototype.getLegend = function (options) {
-    var splitList = this.splitList;
-    var container = document.createElement('div');
-    container.style.cssText = "background:#fff; padding: 5px; border: 1px solid #ccc;";
-    var html = '';
-    for (var key in splitList) {
-        html += '<div style="line-height: 19px;" value="' + key + '"><span style="vertical-align: -2px; display: inline-block; width: 30px;height: 19px;background:' + splitList[key] + ';"></span><span style="margin-left: 3px;">' + key + '<span></div>';
-    }
-    container.innerHTML = html;
-    return container;
-};
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-/**
- * Choropleth
- * @param {Object} splitList:
- *       [
- *           {
- *               start: 0,
- *               end: 2,
- *               value: randomColor()
- *           },{
- *               start: 2,
- *               end: 4,
- *               value: randomColor()
- *           },{
- *               start: 4,
- *               value: randomColor()
- *           }
- *       ];
- *
- */
-function Choropleth(splitList) {
-    this.splitList = splitList || [{
-        start: 0,
-        value: 'red'
-    }];
-}
-
-Choropleth.prototype.get = function (count) {
-    var splitList = this.splitList;
-
-    var value = false;
-
-    for (var i = 0; i < splitList.length; i++) {
-        if ((splitList[i].start === undefined || splitList[i].start !== undefined && count >= splitList[i].start) && (splitList[i].end === undefined || splitList[i].end !== undefined && count < splitList[i].end)) {
-            value = splitList[i].value;
-            break;
-        }
-    }
-
-    return value;
-};
-
-/**
- * 根据DataSet自动生成对应的splitList
- */
-Choropleth.prototype.generateByDataSet = function (dataSet) {
-
-    var min = dataSet.getMin('count');
-    var max = dataSet.getMax('count');
-
-    this.generateByMinMax(min, max);
-};
-
-/**
- * 根据DataSet自动生成对应的splitList
- */
-Choropleth.prototype.generateByMinMax = function (min, max) {
-    var colors = ['rgba(255, 255, 0, 0.8)', 'rgba(253, 98, 104, 0.8)', 'rgba(255, 146, 149, 0.8)', 'rgba(255, 241, 193, 0.8)', 'rgba(110, 176, 253, 0.8)', 'rgba(52, 139, 251, 0.8)', 'rgba(17, 102, 252, 0.8)'];
-    var splitNum = Number((max - min) / 7);
-    // console.log(splitNum)
-    max = Number(max);
-    var index = Number(min);
-    this.splitList = [];
-    var count = 0;
-
-    while (index < max) {
-        this.splitList.push({
-            start: index,
-            end: index + splitNum,
-            value: colors[count]
-        });
-        count++;
-        index += splitNum;
-        // console.log(index, max)
-    }
-    // console.log('splitNum')
-};
-
-Choropleth.prototype.getLegend = function (options) {
-    var splitList = this.splitList;
-};
-
-/**
- * @author Mofei<http://www.zhuwenlong.com>
- */
-
-var MapHelper = function () {
-    function MapHelper(id, type, opt) {
-        classCallCheck(this, MapHelper);
-
-        if (!id || !type) {
-            console.warn('id 和 type 为必填项');
-            return false;
-        }
-
-        if (type == 'baidu') {
-            if (!BMap) {
-                console.warn('请先引入百度地图JS API');
-                return false;
-            }
-        } else {
-            console.warn('暂不支持你的地图类型');
-        }
-        this.type = type;
-        var center = opt && opt.center ? opt.center : [106.962497, 38.208726];
-        var zoom = opt && opt.zoom ? opt.zoom : 5;
-        var map = this.map = new BMap.Map(id, {
-            enableMapClick: false
-        });
-        map.centerAndZoom(new BMap.Point(center[0], center[1]), zoom);
-        map.enableScrollWheelZoom(true);
-
-        map.setMapStyle({
-            style: 'light'
-        });
-    }
-
-    createClass(MapHelper, [{
-        key: 'addLayer',
-        value: function addLayer(datas, options) {
-            if (this.type == 'baidu') {
-                return new mapv.baiduMapLayer(this.map, dataSet, options);
-            }
-        }
-    }, {
-        key: 'getMap',
-        value: function getMap() {
-            return this.map;
-        }
-    }]);
-    return MapHelper;
-}();
-
-/**
- * 一直覆盖在当前地图视野的Canvas对象
- *
- * @author nikai (@胖嘟嘟的骨头, nikai@baidu.com)
- *
- * @param 
- * {
- *     map 地图实例对象
- * }
- */
-
-function CanvasLayer(options) {
-    this.options = options || {};
-    this.paneName = this.options.paneName || 'mapPane';
-    this.context = this.options.context || '2d';
-    this.zIndex = this.options.zIndex || 0;
-    this.mixBlendMode = this.options.mixBlendMode || null;
-    this.enableMassClear = this.options.enableMassClear;
-    this._map = options.map;
-    this._lastDrawTime = null;
-    this.show();
-}
-
-var global$3 = typeof window === 'undefined' ? {} : window;
-var BMap$1 = global$3.BMap || global$3.BMapGL;
-if (BMap$1) {
-
-    CanvasLayer.prototype = new BMap$1.Overlay();
-
-    CanvasLayer.prototype.initialize = function (map) {
-        this._map = map;
-        var canvas = this.canvas = document.createElement("canvas");
-        canvas.style.cssText = "position:absolute;" + "left:0;" + "top:0;" + "z-index:" + this.zIndex + ";user-select:none;";
-        canvas.style.mixBlendMode = this.mixBlendMode;
-        this.adjustSize();
-        var pane = map.getPanes()[this.paneName];
-        if (!pane) {
-            pane = map.getPanes().floatShadow;
-        }
-        pane.appendChild(canvas);
-        var that = this;
-        map.addEventListener('resize', function () {
-            that.adjustSize();
-            that._draw();
-        });
-        map.addEventListener('update', function () {
-            that._draw();
-        });
-        /*
-        map.addEventListener('moving', function() {
-            that._draw();
-        });
-        */
-        if (this.options.updateImmediate) {
-            setTimeout(function () {
-                that._draw();
-            }, 100);
-        }
-        return this.canvas;
-    };
-
-    CanvasLayer.prototype.adjustSize = function () {
-        var size = this._map.getSize();
-        var canvas = this.canvas;
-
-        var devicePixelRatio = this.devicePixelRatio = global$3.devicePixelRatio || 1;
-
-        canvas.width = size.width * devicePixelRatio;
-        canvas.height = size.height * devicePixelRatio;
-        if (this.context == '2d') {
-            canvas.getContext(this.context).scale(devicePixelRatio, devicePixelRatio);
-        }
-
-        canvas.style.width = size.width + "px";
-        canvas.style.height = size.height + "px";
-    };
-
-    CanvasLayer.prototype.draw = function () {
-        var self = this;
-        if (this.options.updateImmediate) {
-            self._draw();
-        } else {
-            clearTimeout(self.timeoutID);
-            self.timeoutID = setTimeout(function () {
-                self._draw();
-            }, 15);
-        }
-    };
-
-    CanvasLayer.prototype._draw = function () {
-        var map = this._map;
-        var size = map.getSize();
-        var center = map.getCenter();
-        if (center) {
-            var pixel = map.pointToOverlayPixel(center);
-            this.canvas.style.left = pixel.x - size.width / 2 + 'px';
-            this.canvas.style.top = pixel.y - size.height / 2 + 'px';
-            this.dispatchEvent('draw');
-            this.options.update && this.options.update.call(this);
-        }
-    };
-
-    CanvasLayer.prototype.getContainer = function () {
-        return this.canvas;
-    };
-
-    CanvasLayer.prototype.show = function () {
-        if (!this.canvas) {
-            this._map.addOverlay(this);
-        }
-        this.canvas.style.display = "block";
-    };
-
-    CanvasLayer.prototype.hide = function () {
-        this.canvas.style.display = "none";
-        //this._map.removeOverlay(this);
-    };
-
-    CanvasLayer.prototype.setZIndex = function (zIndex) {
-        this.zIndex = zIndex;
-        this.canvas.style.zIndex = this.zIndex;
-    };
-
-    CanvasLayer.prototype.getZIndex = function () {
-        return this.zIndex;
-    };
-}
-
-/**
- * Tween.js - Licensed under the MIT license
- * https://github.com/tweenjs/tween.js
- * ----------------------------------------------
- *
- * See https://github.com/tweenjs/tween.js/graphs/contributors for the full list of contributors.
- * Thank you all, you're awesome!
- */
-
-var TWEEN = TWEEN || function () {
-
-    var _tweens = [];
-
-    return {
-
-        getAll: function getAll() {
-
-            return _tweens;
-        },
-
-        removeAll: function removeAll() {
-
-            _tweens = [];
-        },
-
-        add: function add(tween) {
-
-            _tweens.push(tween);
-        },
-
-        remove: function remove(tween) {
-
-            var i = _tweens.indexOf(tween);
-
-            if (i !== -1) {
-                _tweens.splice(i, 1);
-            }
-        },
-
-        update: function update(time, preserve) {
-
-            if (_tweens.length === 0) {
-                return false;
-            }
-
-            var i = 0;
-
-            time = time !== undefined ? time : TWEEN.now();
-
-            while (i < _tweens.length) {
-
-                if (_tweens[i].update(time) || preserve) {
-                    i++;
-                } else {
-                    _tweens.splice(i, 1);
-                }
-            }
-
-            return true;
-        }
-    };
-}();
-
-// Include a performance.now polyfill.
-// In node.js, use process.hrtime.
-if (typeof window === 'undefined' && typeof process !== 'undefined') {
-    TWEEN.now = function () {
-        var time = process.hrtime();
-
-        // Convert [seconds, nanoseconds] to milliseconds.
-        return time[0] * 1000 + time[1] / 1000000;
-    };
-}
-// In a browser, use window.performance.now if it is available.
-else if (typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined) {
-        // This must be bound, because directly assigning this function
-        // leads to an invocation exception in Chrome.
-        TWEEN.now = window.performance.now.bind(window.performance);
-    }
-    // Use Date.now if it is available.
-    else if (Date.now !== undefined) {
-            TWEEN.now = Date.now;
-        }
-        // Otherwise, use 'new Date().getTime()'.
-        else {
-                TWEEN.now = function () {
-                    return new Date().getTime();
-                };
-            }
-
-TWEEN.Tween = function (object) {
-
-    var _object = object;
-    var _valuesStart = {};
-    var _valuesEnd = {};
-    var _valuesStartRepeat = {};
-    var _duration = 1000;
-    var _repeat = 0;
-    var _repeatDelayTime;
-    var _yoyo = false;
-    var _isPlaying = false;
-    var _reversed = false;
-    var _delayTime = 0;
-    var _startTime = null;
-    var _easingFunction = TWEEN.Easing.Linear.None;
-    var _interpolationFunction = TWEEN.Interpolation.Linear;
-    var _chainedTweens = [];
-    var _onStartCallback = null;
-    var _onStartCallbackFired = false;
-    var _onUpdateCallback = null;
-    var _onCompleteCallback = null;
-    var _onStopCallback = null;
-
-    this.to = function (properties, duration) {
-
-        _valuesEnd = properties;
-
-        if (duration !== undefined) {
-            _duration = duration;
-        }
-
-        return this;
-    };
-
-    this.start = function (time) {
-
-        TWEEN.add(this);
-
-        _isPlaying = true;
-
-        _onStartCallbackFired = false;
-
-        _startTime = time !== undefined ? time : TWEEN.now();
-        _startTime += _delayTime;
-
-        for (var property in _valuesEnd) {
-
-            // Check if an Array was provided as property value
-            if (_valuesEnd[property] instanceof Array) {
-
-                if (_valuesEnd[property].length === 0) {
-                    continue;
-                }
-
-                // Create a local copy of the Array with the start value at the front
-                _valuesEnd[property] = [_object[property]].concat(_valuesEnd[property]);
-            }
-
-            // If `to()` specifies a property that doesn't exist in the source object,
-            // we should not set that property in the object
-            if (_object[property] === undefined) {
-                continue;
-            }
-
-            // Save the starting value.
-            _valuesStart[property] = _object[property];
-
-            if (_valuesStart[property] instanceof Array === false) {
-                _valuesStart[property] *= 1.0; // Ensures we're using numbers, not strings
-            }
-
-            _valuesStartRepeat[property] = _valuesStart[property] || 0;
-        }
-
-        return this;
-    };
-
-    this.stop = function () {
-
-        if (!_isPlaying) {
-            return this;
-        }
-
-        TWEEN.remove(this);
-        _isPlaying = false;
-
-        if (_onStopCallback !== null) {
-            _onStopCallback.call(_object, _object);
-        }
-
-        this.stopChainedTweens();
-        return this;
-    };
-
-    this.end = function () {
-
-        this.update(_startTime + _duration);
-        return this;
-    };
-
-    this.stopChainedTweens = function () {
-
-        for (var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++) {
-            _chainedTweens[i].stop();
-        }
-    };
-
-    this.delay = function (amount) {
-
-        _delayTime = amount;
-        return this;
-    };
-
-    this.repeat = function (times) {
-
-        _repeat = times;
-        return this;
-    };
-
-    this.repeatDelay = function (amount) {
-
-        _repeatDelayTime = amount;
-        return this;
-    };
-
-    this.yoyo = function (yoyo) {
-
-        _yoyo = yoyo;
-        return this;
-    };
-
-    this.easing = function (easing) {
-
-        _easingFunction = easing;
-        return this;
-    };
-
-    this.interpolation = function (interpolation) {
-
-        _interpolationFunction = interpolation;
-        return this;
-    };
-
-    this.chain = function () {
-
-        _chainedTweens = arguments;
-        return this;
-    };
-
-    this.onStart = function (callback) {
-
-        _onStartCallback = callback;
-        return this;
-    };
-
-    this.onUpdate = function (callback) {
-
-        _onUpdateCallback = callback;
-        return this;
-    };
-
-    this.onComplete = function (callback) {
-
-        _onCompleteCallback = callback;
-        return this;
-    };
-
-    this.onStop = function (callback) {
-
-        _onStopCallback = callback;
-        return this;
-    };
-
-    this.update = function (time) {
-
-        var property;
-        var elapsed;
-        var value;
-
-        if (time < _startTime) {
-            return true;
-        }
-
-        if (_onStartCallbackFired === false) {
-
-            if (_onStartCallback !== null) {
-                _onStartCallback.call(_object, _object);
-            }
-
-            _onStartCallbackFired = true;
-        }
-
-        elapsed = (time - _startTime) / _duration;
-        elapsed = elapsed > 1 ? 1 : elapsed;
-
-        value = _easingFunction(elapsed);
-
-        for (property in _valuesEnd) {
-
-            // Don't update properties that do not exist in the source object
-            if (_valuesStart[property] === undefined) {
-                continue;
-            }
-
-            var start = _valuesStart[property] || 0;
-            var end = _valuesEnd[property];
-
-            if (end instanceof Array) {
-
-                _object[property] = _interpolationFunction(end, value);
-            } else {
-
-                // Parses relative end values with start as base (e.g.: +10, -3)
-                if (typeof end === 'string') {
-
-                    if (end.charAt(0) === '+' || end.charAt(0) === '-') {
-                        end = start + parseFloat(end);
-                    } else {
-                        end = parseFloat(end);
-                    }
-                }
-
-                // Protect against non numeric properties.
-                if (typeof end === 'number') {
-                    _object[property] = start + (end - start) * value;
-                }
-            }
-        }
-
-        if (_onUpdateCallback !== null) {
-            _onUpdateCallback.call(_object, value);
-        }
-
-        if (elapsed === 1) {
-
-            if (_repeat > 0) {
-
-                if (isFinite(_repeat)) {
-                    _repeat--;
-                }
-
-                // Reassign starting values, restart by making startTime = now
-                for (property in _valuesStartRepeat) {
-
-                    if (typeof _valuesEnd[property] === 'string') {
-                        _valuesStartRepeat[property] = _valuesStartRepeat[property] + parseFloat(_valuesEnd[property]);
-                    }
-
-                    if (_yoyo) {
-                        var tmp = _valuesStartRepeat[property];
-
-                        _valuesStartRepeat[property] = _valuesEnd[property];
-                        _valuesEnd[property] = tmp;
-                    }
-
-                    _valuesStart[property] = _valuesStartRepeat[property];
-                }
-
-                if (_yoyo) {
-                    _reversed = !_reversed;
-                }
-
-                if (_repeatDelayTime !== undefined) {
-                    _startTime = time + _repeatDelayTime;
-                } else {
-                    _startTime = time + _delayTime;
-                }
-
-                return true;
-            } else {
-
-                if (_onCompleteCallback !== null) {
-
-                    _onCompleteCallback.call(_object, _object);
-                }
-
-                for (var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++) {
-                    // Make the chained tweens start exactly at the time they should,
-                    // even if the `update()` method was called way past the duration of the tween
-                    _chainedTweens[i].start(_startTime + _duration);
-                }
-
-                return false;
-            }
-        }
-
-        return true;
-    };
-};
-
-TWEEN.Easing = {
-
-    Linear: {
-
-        None: function None(k) {
-
-            return k;
-        }
-
-    },
-
-    Quadratic: {
-
-        In: function In(k) {
-
-            return k * k;
-        },
-
-        Out: function Out(k) {
-
-            return k * (2 - k);
-        },
-
-        InOut: function InOut(k) {
-
-            if ((k *= 2) < 1) {
-                return 0.5 * k * k;
-            }
-
-            return -0.5 * (--k * (k - 2) - 1);
-        }
-
-    },
-
-    Cubic: {
-
-        In: function In(k) {
-
-            return k * k * k;
-        },
-
-        Out: function Out(k) {
-
-            return --k * k * k + 1;
-        },
-
-        InOut: function InOut(k) {
-
-            if ((k *= 2) < 1) {
-                return 0.5 * k * k * k;
-            }
-
-            return 0.5 * ((k -= 2) * k * k + 2);
-        }
-
-    },
-
-    Quartic: {
-
-        In: function In(k) {
-
-            return k * k * k * k;
-        },
-
-        Out: function Out(k) {
-
-            return 1 - --k * k * k * k;
-        },
-
-        InOut: function InOut(k) {
-
-            if ((k *= 2) < 1) {
-                return 0.5 * k * k * k * k;
-            }
-
-            return -0.5 * ((k -= 2) * k * k * k - 2);
-        }
-
-    },
-
-    Quintic: {
-
-        In: function In(k) {
-
-            return k * k * k * k * k;
-        },
-
-        Out: function Out(k) {
-
-            return --k * k * k * k * k + 1;
-        },
-
-        InOut: function InOut(k) {
-
-            if ((k *= 2) < 1) {
-                return 0.5 * k * k * k * k * k;
-            }
-
-            return 0.5 * ((k -= 2) * k * k * k * k + 2);
-        }
-
-    },
-
-    Sinusoidal: {
-
-        In: function In(k) {
-
-            return 1 - Math.cos(k * Math.PI / 2);
-        },
-
-        Out: function Out(k) {
-
-            return Math.sin(k * Math.PI / 2);
-        },
-
-        InOut: function InOut(k) {
-
-            return 0.5 * (1 - Math.cos(Math.PI * k));
-        }
-
-    },
-
-    Exponential: {
-
-        In: function In(k) {
-
-            return k === 0 ? 0 : Math.pow(1024, k - 1);
-        },
-
-        Out: function Out(k) {
-
-            return k === 1 ? 1 : 1 - Math.pow(2, -10 * k);
-        },
-
-        InOut: function InOut(k) {
-
-            if (k === 0) {
-                return 0;
-            }
-
-            if (k === 1) {
-                return 1;
-            }
-
-            if ((k *= 2) < 1) {
-                return 0.5 * Math.pow(1024, k - 1);
-            }
-
-            return 0.5 * (-Math.pow(2, -10 * (k - 1)) + 2);
-        }
-
-    },
-
-    Circular: {
-
-        In: function In(k) {
-
-            return 1 - Math.sqrt(1 - k * k);
-        },
-
-        Out: function Out(k) {
-
-            return Math.sqrt(1 - --k * k);
-        },
-
-        InOut: function InOut(k) {
-
-            if ((k *= 2) < 1) {
-                return -0.5 * (Math.sqrt(1 - k * k) - 1);
-            }
-
-            return 0.5 * (Math.sqrt(1 - (k -= 2) * k) + 1);
-        }
-
-    },
-
-    Elastic: {
-
-        In: function In(k) {
-
-            if (k === 0) {
-                return 0;
-            }
-
-            if (k === 1) {
-                return 1;
-            }
-
-            return -Math.pow(2, 10 * (k - 1)) * Math.sin((k - 1.1) * 5 * Math.PI);
-        },
-
-        Out: function Out(k) {
-
-            if (k === 0) {
-                return 0;
-            }
-
-            if (k === 1) {
-                return 1;
-            }
-
-            return Math.pow(2, -10 * k) * Math.sin((k - 0.1) * 5 * Math.PI) + 1;
-        },
-
-        InOut: function InOut(k) {
-
-            if (k === 0) {
-                return 0;
-            }
-
-            if (k === 1) {
-                return 1;
-            }
-
-            k *= 2;
-
-            if (k < 1) {
-                return -0.5 * Math.pow(2, 10 * (k - 1)) * Math.sin((k - 1.1) * 5 * Math.PI);
-            }
-
-            return 0.5 * Math.pow(2, -10 * (k - 1)) * Math.sin((k - 1.1) * 5 * Math.PI) + 1;
-        }
-
-    },
-
-    Back: {
-
-        In: function In(k) {
-
-            var s = 1.70158;
-
-            return k * k * ((s + 1) * k - s);
-        },
-
-        Out: function Out(k) {
-
-            var s = 1.70158;
-
-            return --k * k * ((s + 1) * k + s) + 1;
-        },
-
-        InOut: function InOut(k) {
-
-            var s = 1.70158 * 1.525;
-
-            if ((k *= 2) < 1) {
-                return 0.5 * (k * k * ((s + 1) * k - s));
-            }
-
-            return 0.5 * ((k -= 2) * k * ((s + 1) * k + s) + 2);
-        }
-
-    },
-
-    Bounce: {
-
-        In: function In(k) {
-
-            return 1 - TWEEN.Easing.Bounce.Out(1 - k);
-        },
-
-        Out: function Out(k) {
-
-            if (k < 1 / 2.75) {
-                return 7.5625 * k * k;
-            } else if (k < 2 / 2.75) {
-                return 7.5625 * (k -= 1.5 / 2.75) * k + 0.75;
-            } else if (k < 2.5 / 2.75) {
-                return 7.5625 * (k -= 2.25 / 2.75) * k + 0.9375;
-            } else {
-                return 7.5625 * (k -= 2.625 / 2.75) * k + 0.984375;
-            }
-        },
-
-        InOut: function InOut(k) {
-
-            if (k < 0.5) {
-                return TWEEN.Easing.Bounce.In(k * 2) * 0.5;
-            }
-
-            return TWEEN.Easing.Bounce.Out(k * 2 - 1) * 0.5 + 0.5;
-        }
-
-    }
-
-};
-
-TWEEN.Interpolation = {
-
-    Linear: function Linear(v, k) {
-
-        var m = v.length - 1;
-        var f = m * k;
-        var i = Math.floor(f);
-        var fn = TWEEN.Interpolation.Utils.Linear;
-
-        if (k < 0) {
-            return fn(v[0], v[1], f);
-        }
-
-        if (k > 1) {
-            return fn(v[m], v[m - 1], m - f);
-        }
-
-        return fn(v[i], v[i + 1 > m ? m : i + 1], f - i);
-    },
-
-    Bezier: function Bezier(v, k) {
-
-        var b = 0;
-        var n = v.length - 1;
-        var pw = Math.pow;
-        var bn = TWEEN.Interpolation.Utils.Bernstein;
-
-        for (var i = 0; i <= n; i++) {
-            b += pw(1 - k, n - i) * pw(k, i) * v[i] * bn(n, i);
-        }
-
-        return b;
-    },
-
-    CatmullRom: function CatmullRom(v, k) {
-
-        var m = v.length - 1;
-        var f = m * k;
-        var i = Math.floor(f);
-        var fn = TWEEN.Interpolation.Utils.CatmullRom;
-
-        if (v[0] === v[m]) {
-
-            if (k < 0) {
-                i = Math.floor(f = m * (1 + k));
-            }
-
-            return fn(v[(i - 1 + m) % m], v[i], v[(i + 1) % m], v[(i + 2) % m], f - i);
-        } else {
-
-            if (k < 0) {
-                return v[0] - (fn(v[0], v[0], v[1], v[1], -f) - v[0]);
-            }
-
-            if (k > 1) {
-                return v[m] - (fn(v[m], v[m], v[m - 1], v[m - 1], f - m) - v[m]);
-            }
-
-            return fn(v[i ? i - 1 : 0], v[i], v[m < i + 1 ? m : i + 1], v[m < i + 2 ? m : i + 2], f - i);
-        }
-    },
-
-    Utils: {
-
-        Linear: function Linear(p0, p1, t) {
-
-            return (p1 - p0) * t + p0;
-        },
-
-        Bernstein: function Bernstein(n, i) {
-
-            var fc = TWEEN.Interpolation.Utils.Factorial;
-
-            return fc(n) / fc(i) / fc(n - i);
-        },
-
-        Factorial: function () {
-
-            var a = [1];
-
-            return function (n) {
-
-                var s = 1;
-
-                if (a[n]) {
-                    return a[n];
-                }
-
-                for (var i = n; i > 1; i--) {
-                    s *= i;
-                }
-
-                a[n] = s;
-                return s;
-            };
-        }(),
-
-        CatmullRom: function CatmullRom(p0, p1, p2, p3, t) {
-
-            var v0 = (p2 - p0) * 0.5;
-            var v1 = (p3 - p1) * 0.5;
-            var t2 = t * t;
-            var t3 = t * t2;
-
-            return (2 * p1 - 2 * p2 + v0 + v1) * t3 + (-3 * p1 + 3 * p2 - 2 * v0 - v1) * t2 + v0 * t + p1;
-        }
-
-    }
-
-};
-
-/**
- * 根据2点获取角度
- * @param Array [123, 23] 点1
- * @param Array [123, 23] 点2
- * @return angle 角度,不是弧度
- */
-function getAngle(start, end) {
-    var diff_x = end[0] - start[0];
-    var diff_y = end[1] - start[1];
-    var deg = 360 * Math.atan(diff_y / diff_x) / (2 * Math.PI);
-    if (end[0] < start[0]) {
-        deg = deg + 180;
-    }
-    return deg;
-}
-
-/**
- * 绘制沿线箭头
- * @author kyle / http://nikai.us/
- */
-
-var imageCache = {};
-
-var object = {
+var drawGrid = {
     draw: function draw(context, dataSet, options) {
-        var imageCacheKey = 'http://huiyan.baidu.com/github/tools/gis-drawing/static/images/direction.png';
-        if (options.arrow && options.arrow.url) {
-            imageCacheKey = options.arrow.url;
-        }
 
-        if (!imageCache[imageCacheKey]) {
-            imageCache[imageCacheKey] = null;
-        }
-
-        var directionImage = imageCache[imageCacheKey];
-
-        if (!directionImage) {
-            var args = Array.prototype.slice.call(arguments);
-            var image = new Image();
-            image.onload = function () {
-                imageCache[imageCacheKey] = image;
-                object.draw.apply(null, args);
-            };
-            image.src = imageCacheKey;
-            return;
-        }
+        context.save();
 
         var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
 
-        // console.log('xxxx',options)
-        context.save();
+        var grids = {};
 
-        for (var key in options) {
-            context[key] = options[key];
-        }
+        var size = options._size || options.size || 50;
 
-        var points = [];
-        var preCoordinate = null;
-        for (var i = 0, len = data.length; i < len; i++) {
+        // 后端传入数据为网格数据时，传入enableCluster为false，前端不进行删格化操作，直接画方格	
+        var enableCluster = 'enableCluster' in options ? options.enableCluster : true;
 
-            var item = data[i];
-
-            context.save();
-
-            if (item.fillStyle || item._fillStyle) {
-                context.fillStyle = item.fillStyle || item._fillStyle;
-            }
-
-            if (item.strokeStyle || item._strokeStyle) {
-                context.strokeStyle = item.strokeStyle || item._strokeStyle;
-            }
-
-            var type = item.geometry.type;
-
-            context.beginPath();
-            if (type === 'LineString') {
-                var coordinates = item.geometry._coordinates || item.geometry.coordinates;
-                var interval = options.arrow.interval !== undefined ? options.arrow.interval : 1;
-                for (var j = 0; j < coordinates.length; j += interval) {
-                    if (coordinates[j] && coordinates[j + 1]) {
-                        var coordinate = coordinates[j];
-
-                        if (preCoordinate && getDistance(coordinate, preCoordinate) < 30) {
-                            continue;
-                        }
-
-                        context.save();
-                        var angle = getAngle(coordinates[j], coordinates[j + 1]);
-                        context.translate(coordinate[0], coordinate[1]);
-                        context.rotate(angle * Math.PI / 180);
-                        context.drawImage(directionImage, -directionImage.width / 2 / 2, -directionImage.height / 2 / 2, directionImage.width / 2, directionImage.height / 2);
-                        context.restore();
-
-                        points.push(coordinate);
-                        preCoordinate = coordinate;
-                    }
-                }
-            }
-
-            context.restore();
-        }
-
-        context.restore();
-    }
-};
-
-function getDistance(coordinateA, coordinateB) {
-    return Math.sqrt(Math.pow(coordinateA[0] - coordinateB[0], 2) + Math.pow(coordinateA[1] - coordinateB[1], 2));
-}
-
-/**
- * @author Mofei Zhu<mapv@zhuwenlong.com>
- * This file is to draw text
- */
-
-var drawClip = {
-    draw: function draw(context, dataSet, options) {
-        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
-        context.save();
-
-        context.fillStyle = options.fillStyle || 'rgba(0, 0, 0, 0.5)';
-        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-
-        options.multiPolygonDraw = function () {
-            context.save();
-            context.clip();
-            clear(context);
-            context.restore();
+        var offset = options.offset || {
+            x: 0,
+            y: 0
         };
 
-        for (var i = 0, len = data.length; i < len; i++) {
+        var intensity = new Intensity({
+            min: options.min || 0,
+            max: options.max || 100,
+            gradient: options.gradient
+        });
 
-            context.beginPath();
+        if (!enableCluster) {
+            for (var i = 0; i < data.length; i++) {
+                var coordinates = data[i].geometry._coordinates || data[i].geometry.coordinates;
+                var gridKey = coordinates.join(',');
+                grids[gridKey] = data[i].count || 1;
+            }
+            for (var _gridKey in grids) {
+                _gridKey = _gridKey.split(',');
 
-            pathSimple.drawDataSet(context, [data[i]], options);
-            context.save();
-            context.clip();
-            clear(context);
-            context.restore();
+                context.beginPath();
+                context.rect(+_gridKey[0] - size / 2, +_gridKey[1] - size / 2, size, size);
+                context.fillStyle = intensity.getColor(grids[_gridKey]);
+                context.fill();
+                if (options.strokeStyle && options.lineWidth) {
+                    context.stroke();
+                }
+            }
+        } else {
+            for (var _i = 0; _i < data.length; _i++) {
+                var coordinates = data[_i].geometry._coordinates || data[_i].geometry.coordinates;
+                var gridKey = Math.floor((coordinates[0] - offset.x) / size) + ',' + Math.floor((coordinates[1] - offset.y) / size);
+                if (!grids[gridKey]) {
+                    grids[gridKey] = 0;
+                }
+
+                grids[gridKey] += ~~(data[_i].count || 1);
+            }
+
+            for (var _gridKey2 in grids) {
+                _gridKey2 = _gridKey2.split(',');
+
+                context.beginPath();
+                context.rect(_gridKey2[0] * size + .5 + offset.x, _gridKey2[1] * size + .5 + offset.y, size, size);
+                context.fillStyle = intensity.getColor(grids[_gridKey2]);
+                context.fill();
+                if (options.strokeStyle && options.lineWidth) {
+                    context.stroke();
+                }
+            }
+        }
+
+        if (options.label && options.label.show !== false) {
+
+            context.fillStyle = options.label.fillStyle || 'white';
+
+            if (options.label.font) {
+                context.font = options.label.font;
+            }
+
+            if (options.label.shadowColor) {
+                context.shadowColor = options.label.shadowColor;
+            }
+
+            if (options.label.shadowBlur) {
+                context.shadowBlur = options.label.shadowBlur;
+            }
+
+            for (var gridKey in grids) {
+                gridKey = gridKey.split(',');
+                var text = grids[gridKey];
+                var textWidth = context.measureText(text).width;
+                if (!enableCluster) {
+                    context.fillText(text, +gridKey[0] - textWidth / 2, +gridKey[1] + 5);
+                } else {
+                    context.fillText(text, gridKey[0] * size + .5 + offset.x + size / 2 - textWidth / 2, gridKey[1] * size + .5 + offset.y + size / 2 + 5);
+                }
+            }
         }
 
         context.restore();
@@ -4241,6 +3402,141 @@ function getImage(url, callback, fallback) {
     };
     img.src = window.decodeURIComponent(url);
 }
+
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+function hex_corner$1(center, size, i) {
+    var angle_deg = 60 * i + 30;
+    var angle_rad = Math.PI / 180 * angle_deg;
+    return [center.x + size * Math.cos(angle_rad), center.y + size * Math.sin(angle_rad)];
+}
+
+var drawHoneycomb = {
+    draw: function draw(context, dataSet, options) {
+
+        context.save();
+
+        var data = dataSet instanceof DataSet ? dataSet.get() : dataSet;
+
+        for (var key in options) {
+            context[key] = options[key];
+        }
+
+        var grids = {};
+
+        var offset = options.offset || {
+            x: 10,
+            y: 10
+        };
+
+        var r = options._size || options.size || 40;
+        r = r / 2 / Math.sin(Math.PI / 3);
+        var dx = r * 2 * Math.sin(Math.PI / 3);
+        var dy = r * 1.5;
+
+        var binsById = {};
+
+        for (var i = 0; i < data.length; i++) {
+            var coordinates = data[i].geometry._coordinates || data[i].geometry.coordinates;
+            var py = (coordinates[1] - offset.y) / dy,
+                pj = Math.round(py),
+                px = (coordinates[0] - offset.x) / dx - (pj & 1 ? .5 : 0),
+                pi = Math.round(px),
+                py1 = py - pj;
+
+            if (Math.abs(py1) * 3 > 1) {
+                var px1 = px - pi,
+                    pi2 = pi + (px < pi ? -1 : 1) / 2,
+                    pj2 = pj + (py < pj ? -1 : 1),
+                    px2 = px - pi2,
+                    py2 = py - pj2;
+                if (px1 * px1 + py1 * py1 > px2 * px2 + py2 * py2) pi = pi2 + (pj & 1 ? 1 : -1) / 2, pj = pj2;
+            }
+
+            var id = pi + "-" + pj,
+                bin = binsById[id];
+            if (bin) {
+                bin.push(data[i]);
+            } else {
+                bin = binsById[id] = [data[i]];
+                bin.i = pi;
+                bin.j = pj;
+                bin.x = (pi + (pj & 1 ? 1 / 2 : 0)) * dx;
+                bin.y = pj * dy;
+            }
+        }
+
+        var intensity = new Intensity({
+            max: options.max || 100,
+            maxSize: r,
+            gradient: options.gradient
+        });
+
+        for (var key in binsById) {
+
+            var item = binsById[key];
+
+            context.beginPath();
+
+            for (var j = 0; j < 6; j++) {
+
+                var result = hex_corner$1({
+                    x: item.x + offset.x,
+                    y: item.y + offset.y
+                }, r, j);
+
+                context.lineTo(result[0], result[1]);
+            }
+
+            context.closePath();
+
+            var count = 0;
+            for (var i = 0; i < item.length; i++) {
+                count += item[i].count || 1;
+            }
+            item.count = count;
+
+            context.fillStyle = intensity.getColor(count);
+            context.fill();
+            if (options.strokeStyle && options.lineWidth) {
+                context.stroke();
+            }
+        }
+
+        if (options.label && options.label.show !== false) {
+
+            context.fillStyle = options.label.fillStyle || 'white';
+
+            if (options.label.font) {
+                context.font = options.label.font;
+            }
+
+            if (options.label.shadowColor) {
+                context.shadowColor = options.label.shadowColor;
+            }
+
+            if (options.label.shadowBlur) {
+                context.shadowBlur = options.label.shadowBlur;
+            }
+
+            for (var key in binsById) {
+                var item = binsById[key];
+                var text = item.count;
+                if (text < 0) {
+                    text = text.toFixed(2);
+                } else {
+                    text = ~~text;
+                }
+                var textWidth = context.measureText(text).width;
+                context.fillText(text, item.x + offset.x - textWidth / 2, item.y + offset.y + 5);
+            }
+        }
+
+        context.restore();
+    }
+};
 
 /**
  * @author Mofei Zhu<mapv@zhuwenlong.com>
@@ -5518,3135 +4814,7 @@ var BaseLayer = function () {
     return BaseLayer;
 }();
 
-var global$4 = typeof window === 'undefined' ? {} : window;
-var BMap$2 = global$4.BMap || global$4.BMapGL;
-
-var AnimationLayer = function (_BaseLayer) {
-    inherits(AnimationLayer, _BaseLayer);
-
-    function AnimationLayer(map, dataSet, options) {
-        classCallCheck(this, AnimationLayer);
-
-        var _this = possibleConstructorReturn(this, (AnimationLayer.__proto__ || Object.getPrototypeOf(AnimationLayer)).call(this, map, dataSet, options));
-
-        _this.map = map;
-        _this.options = options || {};
-        _this.dataSet = dataSet;
-
-        var canvasLayer = new CanvasLayer({
-            map: map,
-            zIndex: _this.options.zIndex,
-            update: _this._canvasUpdate.bind(_this)
-        });
-
-        _this.init(_this.options);
-
-        _this.canvasLayer = canvasLayer;
-        _this.transferToMercator();
-        var self = _this;
-        dataSet.on('change', function () {
-            self.transferToMercator();
-            canvasLayer.draw();
-        });
-        _this.ctx = canvasLayer.canvas.getContext('2d');
-
-        _this.start();
-        return _this;
-    }
-
-    createClass(AnimationLayer, [{
-        key: "draw",
-        value: function draw() {
-            this.canvasLayer.draw();
-        }
-    }, {
-        key: "init",
-        value: function init(options) {
-
-            var self = this;
-            self.options = options;
-            this.initDataRange(options);
-            this.context = self.options.context || '2d';
-
-            if (self.options.zIndex) {
-                this.canvasLayer && this.canvasLayer.setZIndex(self.options.zIndex);
-            }
-
-            if (self.options.max) {
-                this.intensity.setMax(self.options.max);
-            }
-
-            if (self.options.min) {
-                this.intensity.setMin(self.options.min);
-            }
-
-            this.initAnimator();
-        }
-
-        // 经纬度左边转换为墨卡托坐标
-
-    }, {
-        key: "transferToMercator",
-        value: function transferToMercator() {
-            var map = this.map;
-            var mapType = map.getMapType();
-            var projection;
-            if (mapType.getProjection) {
-                projection = mapType.getProjection();
-            } else {
-                projection = {
-                    lngLatToPoint: function lngLatToPoint(point) {
-                        var mc = map.lnglatToMercator(point.lng, point.lat);
-                        return {
-                            x: mc[0],
-                            y: mc[1]
-                        };
-                    }
-                };
-            }
-
-            if (this.options.coordType !== 'bd09mc') {
-                var data = this.dataSet.get();
-                data = this.dataSet.transferCoordinate(data, function (coordinates) {
-                    var pixel = projection.lngLatToPoint({
-                        lng: coordinates[0],
-                        lat: coordinates[1]
-                    });
-                    return [pixel.x, pixel.y];
-                }, 'coordinates', 'coordinates_mercator');
-                this.dataSet._set(data);
-            }
-        }
-    }, {
-        key: "_canvasUpdate",
-        value: function _canvasUpdate() {
-            var ctx = this.ctx;
-            if (!ctx) {
-                return;
-            }
-            //clear(ctx);
-            var map = this.map;
-            var projection;
-            var mcCenter;
-            if (map.getMapType().getProjection) {
-                projection = map.getMapType().getProjection();
-                mcCenter = projection.lngLatToPoint(map.getCenter());
-            } else {
-                mcCenter = {
-                    x: map.getCenter().lng,
-                    y: map.getCenter().lat
-                };
-                if (mcCenter.x > -180 && mcCenter.x < 180) {
-                    mcCenter = map.lnglatToMercator(mcCenter.x, mcCenter.y);
-                    mcCenter = { x: mcCenter[0], y: mcCenter[1] };
-                }
-                projection = {
-                    lngLatToPoint: function lngLatToPoint(point) {
-                        var mc = map.lnglatToMercator(point.lng, point.lat);
-                        return {
-                            x: mc[0],
-                            y: mc[1]
-                        };
-                    }
-                };
-            }
-            var zoomUnit;
-            if (projection.getZoomUnits) {
-                zoomUnit = projection.getZoomUnits(map.getZoom());
-            } else {
-                zoomUnit = Math.pow(2, 18 - map.getZoom());
-            }
-            var nwMc = new BMap$2.Pixel(mcCenter.x - map.getSize().width / 2 * zoomUnit, mcCenter.y + map.getSize().height / 2 * zoomUnit); //左上角墨卡托坐标
-
-            clear(ctx);
-
-            var dataGetOptions = {
-                fromColumn: this.options.coordType == 'bd09mc' ? 'coordinates' : 'coordinates_mercator',
-                transferCoordinate: function transferCoordinate(coordinate) {
-                    if (!coordinate) {
-                        return;
-                    }
-                    var x = (coordinate[0] - nwMc.x) / zoomUnit;
-                    var y = (nwMc.y - coordinate[1]) / zoomUnit;
-                    return [x, y];
-                }
-            };
-
-            this.data = this.dataSet.get(dataGetOptions);
-
-            this.processData(this.data);
-
-            this.drawAnimation();
-        }
-    }, {
-        key: "drawAnimation",
-        value: function drawAnimation() {
-            var ctx = this.ctx;
-            var data = this.data;
-            if (!data) {
-                return;
-            }
-
-            ctx.save();
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.fillStyle = 'rgba(0, 0, 0, .1)';
-            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.restore();
-
-            ctx.save();
-            if (this.options.shadowColor) {
-                ctx.shadowColor = this.options.shadowColor;
-            }
-
-            if (this.options.shadowBlur) {
-                ctx.shadowBlur = this.options.shadowBlur;
-            }
-
-            if (this.options.globalAlpha) {
-                ctx.globalAlpha = this.options.globalAlpha;
-            }
-
-            if (this.options.globalCompositeOperation) {
-                ctx.globalCompositeOperation = this.options.globalCompositeOperation;
-            }
-
-            var options = this.options;
-            for (var i = 0; i < data.length; i++) {
-                if (data[i].geometry.type === 'Point') {
-                    ctx.beginPath();
-                    var maxSize = data[i].size || this.options.size;
-                    var minSize = data[i].minSize || this.options.minSize || 0;
-                    if (data[i]._size === undefined) {
-                        data[i]._size = minSize;
-                    }
-                    ctx.arc(data[i].geometry._coordinates[0], data[i].geometry._coordinates[1], data[i]._size, 0, Math.PI * 2, true);
-                    ctx.closePath();
-
-                    data[i]._size++;
-
-                    if (data[i]._size > maxSize) {
-                        data[i]._size = minSize;
-                    }
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = data[i].strokeStyle || data[i]._strokeStyle || options.strokeStyle || 'yellow';
-                    ctx.stroke();
-                    var fillStyle = data[i].fillStyle || data[i]._fillStyle || options.fillStyle;
-                    if (fillStyle) {
-                        ctx.fillStyle = fillStyle;
-                        ctx.fill();
-                    }
-                } else if (data[i].geometry.type === 'LineString') {
-                    ctx.beginPath();
-                    var size = data[i].size || this.options.size || 5;
-                    var minSize = data[i].minSize || this.options.minSize || 0;
-                    if (data[i]._index === undefined) {
-                        data[i]._index = 0;
-                    }
-                    var index = data[i]._index;
-                    ctx.arc(data[i].geometry._coordinates[index][0], data[i].geometry._coordinates[index][1], size, 0, Math.PI * 2, true);
-                    ctx.closePath();
-
-                    data[i]._index++;
-
-                    if (data[i]._index >= data[i].geometry._coordinates.length) {
-                        data[i]._index = 0;
-                    }
-
-                    var strokeStyle = data[i].strokeStyle || options.strokeStyle;
-                    var fillStyle = data[i].fillStyle || options.fillStyle || 'yellow';
-                    ctx.fillStyle = fillStyle;
-                    ctx.fill();
-                    if (strokeStyle && options.lineWidth) {
-                        ctx.lineWidth = options.lineWidth || 1;
-                        ctx.strokeStyle = strokeStyle;
-                        ctx.stroke();
-                    }
-                }
-            }
-            ctx.restore();
-        }
-    }, {
-        key: "animate",
-        value: function animate() {
-            this.drawAnimation();
-            var animateTime = this.options.animateTime || 100;
-            this.timeout = setTimeout(this.animate.bind(this), animateTime);
-        }
-    }, {
-        key: "start",
-        value: function start() {
-            this.stop();
-            this.animate();
-        }
-    }, {
-        key: "stop",
-        value: function stop() {
-            clearTimeout(this.timeout);
-        }
-    }, {
-        key: "unbindEvent",
-        value: function unbindEvent() {}
-    }, {
-        key: "hide",
-        value: function hide() {
-            this.canvasLayer.hide();
-            this.stop();
-        }
-    }, {
-        key: "show",
-        value: function show() {
-            this.start();
-        }
-    }, {
-        key: "clearData",
-        value: function clearData() {
-            this.dataSet && this.dataSet.clear();
-            this.update({
-                options: null
-            });
-        }
-    }, {
-        key: "destroy",
-        value: function destroy() {
-            this.stop();
-            this.unbindEvent();
-            this.clearData();
-            this.map.removeOverlay(this.canvasLayer);
-            this.canvasLayer = null;
-        }
-    }]);
-    return AnimationLayer;
-}(BaseLayer);
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-var global$5 = typeof window === 'undefined' ? {} : window;
-var BMap$3 = global$5.BMap || global$5.BMapGL;
-
-var Layer = function (_BaseLayer) {
-    inherits(Layer, _BaseLayer);
-
-    function Layer(map, dataSet, options) {
-        classCallCheck(this, Layer);
-
-        var _this = possibleConstructorReturn(this, (Layer.__proto__ || Object.getPrototypeOf(Layer)).call(this, map, dataSet, options));
-
-        var self = _this;
-        options = options || {};
-
-        _this.clickEvent = _this.clickEvent.bind(_this);
-        _this.mousemoveEvent = _this.mousemoveEvent.bind(_this);
-        _this.tapEvent = _this.tapEvent.bind(_this);
-
-        self.init(options);
-        self.argCheck(options);
-        self.transferToMercator();
-
-        var canvasLayer = _this.canvasLayer = new CanvasLayer({
-            map: map,
-            context: _this.context,
-            updateImmediate: options.updateImmediate,
-            paneName: options.paneName,
-            mixBlendMode: options.mixBlendMode,
-            enableMassClear: options.enableMassClear,
-            zIndex: options.zIndex,
-            update: function update() {
-                self._canvasUpdate();
-            }
-        });
-
-        dataSet.on('change', function () {
-            self.transferToMercator();
-            // 数据更新后重新生成聚合数据
-            if (options.draw === 'cluster') {
-                self.refreshCluster();
-            }
-            canvasLayer.draw();
-        });
-        return _this;
-    }
-
-    createClass(Layer, [{
-        key: 'clickEvent',
-        value: function clickEvent(e) {
-            var pixel = e.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), 'clickEvent', this).call(this, pixel, e);
-        }
-    }, {
-        key: 'mousemoveEvent',
-        value: function mousemoveEvent(e) {
-            var pixel = e.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), 'mousemoveEvent', this).call(this, pixel, e);
-        }
-    }, {
-        key: 'tapEvent',
-        value: function tapEvent(e) {
-            var pixel = e.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), 'tapEvent', this).call(this, pixel, e);
-        }
-    }, {
-        key: 'bindEvent',
-        value: function bindEvent(e) {
-            this.unbindEvent();
-            var map = this.map;
-            var timer = 0;
-            var that = this;
-
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.setDefaultCursor('default');
-                    map.addEventListener('click', this.clickEvent);
-                }
-                if (this.options.methods.mousemove) {
-                    map.addEventListener('mousemove', this.mousemoveEvent);
-                }
-
-                if ('ontouchend' in window.document && this.options.methods.tap) {
-                    map.addEventListener('touchstart', function (e) {
-                        timer = new Date();
-                    });
-                    map.addEventListener('touchend', function (e) {
-                        if (new Date() - timer < 300) {
-                            that.tapEvent(e);
-                        }
-                    });
-                }
-            }
-        }
-    }, {
-        key: 'unbindEvent',
-        value: function unbindEvent(e) {
-            var map = this.map;
-
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.removeEventListener('click', this.clickEvent);
-                }
-                if (this.options.methods.mousemove) {
-                    map.removeEventListener('mousemove', this.mousemoveEvent);
-                }
-            }
-        }
-
-        // 经纬度左边转换为墨卡托坐标
-
-    }, {
-        key: 'transferToMercator',
-        value: function transferToMercator(dataSet) {
-            if (!dataSet) {
-                dataSet = this.dataSet;
-            }
-
-            var map = this.map;
-
-            var mapType = map.getMapType();
-            var projection;
-            if (mapType.getProjection) {
-                projection = mapType.getProjection();
-            } else {
-                projection = {
-                    lngLatToPoint: function lngLatToPoint(point) {
-                        var mc = map.lnglatToMercator(point.lng, point.lat);
-                        return {
-                            x: mc[0],
-                            y: mc[1]
-                        };
-                    }
-                };
-            }
-
-            if (this.options.coordType !== 'bd09mc') {
-                var data = dataSet.get();
-                data = dataSet.transferCoordinate(data, function (coordinates) {
-                    if (coordinates[0] < -180 || coordinates[0] > 180 || coordinates[1] < -90 || coordinates[1] > 90) {
-                        return coordinates;
-                    } else {
-                        var pixel = projection.lngLatToPoint({
-                            lng: coordinates[0],
-                            lat: coordinates[1]
-                        });
-                        return [pixel.x, pixel.y];
-                    }
-                }, 'coordinates', 'coordinates_mercator');
-                dataSet._set(data);
-            }
-        }
-    }, {
-        key: 'getContext',
-        value: function getContext() {
-            return this.canvasLayer.canvas.getContext(this.context);
-        }
-    }, {
-        key: '_canvasUpdate',
-        value: function _canvasUpdate(time) {
-            if (!this.canvasLayer) {
-                return;
-            }
-            var self = this;
-            var animationOptions = this.options.animation;
-            var map = this.canvasLayer._map;
-            var projection;
-            var mcCenter;
-            if (map.getMapType().getProjection) {
-                projection = map.getMapType().getProjection();
-                mcCenter = projection.lngLatToPoint(map.getCenter());
-            } else {
-                mcCenter = {
-                    x: map.getCenter().lng,
-                    y: map.getCenter().lat
-                };
-                if (mcCenter.x > -180 && mcCenter.x < 180) {
-                    mcCenter = map.lnglatToMercator(mcCenter.x, mcCenter.y);
-                    mcCenter = { x: mcCenter[0], y: mcCenter[1] };
-                }
-                projection = {
-                    lngLatToPoint: function lngLatToPoint(point) {
-                        var mc = map.lnglatToMercator(point.lng, point.lat);
-                        return {
-                            x: mc[0],
-                            y: mc[1]
-                        };
-                    }
-                };
-            }
-            var zoomUnit;
-            if (projection.getZoomUnits) {
-                zoomUnit = projection.getZoomUnits(map.getZoom());
-            } else {
-                zoomUnit = Math.pow(2, 18 - map.getZoom());
-            }
-            //左上角墨卡托坐标
-            var nwMc = new BMap$3.Pixel(mcCenter.x - map.getSize().width / 2 * zoomUnit, mcCenter.y + map.getSize().height / 2 * zoomUnit);
-
-            var context = this.getContext();
-            if (this.isEnabledTime()) {
-                if (time === undefined) {
-                    clear(context);
-                    return;
-                }
-                if (this.context == '2d') {
-                    context.save();
-                    context.globalCompositeOperation = 'destination-out';
-                    context.fillStyle = 'rgba(0, 0, 0, .1)';
-                    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-                    context.restore();
-                }
-            } else {
-                clear(context);
-            }
-
-            if (this.context == '2d') {
-                for (var key in this.options) {
-                    context[key] = this.options[key];
-                }
-            } else {
-                context.clear(context.COLOR_BUFFER_BIT);
-            }
-
-            if (this.options.minZoom && map.getZoom() < this.options.minZoom || this.options.maxZoom && map.getZoom() > this.options.maxZoom) {
-                return;
-            }
-
-            var scale = 1;
-            if (this.context != '2d') {
-                scale = this.canvasLayer.devicePixelRatio;
-            }
-
-            var dataGetOptions = {
-                fromColumn: this.options.coordType == 'bd09mc' ? 'coordinates' : 'coordinates_mercator',
-                transferCoordinate: function transferCoordinate(coordinate) {
-                    var x = (coordinate[0] - nwMc.x) / zoomUnit * scale;
-                    var y = (nwMc.y - coordinate[1]) / zoomUnit * scale;
-                    return [x, y];
-                }
-            };
-
-            if (time !== undefined) {
-                dataGetOptions.filter = function (item) {
-                    var trails = animationOptions.trails || 10;
-                    if (time && item.time > time - trails && item.time < time) {
-                        return true;
-                    } else {
-                        return false;
-                    }
-                };
-            }
-
-            // get data from data set
-            var data;
-            var zoom = this.getZoom();
-            if (this.options.draw === 'cluster' && (!this.options.maxClusterZoom || this.options.maxClusterZoom >= zoom)) {
-                var bounds = this.map.getBounds();
-                var ne = bounds.getNorthEast();
-                var sw = bounds.getSouthWest();
-                var clusterData = this.supercluster.getClusters([sw.lng, sw.lat, ne.lng, ne.lat], zoom);
-                this.pointCountMax = this.supercluster.trees[zoom].max;
-                this.pointCountMin = this.supercluster.trees[zoom].min;
-                var intensity = {};
-                var color = null;
-                var size = null;
-                if (this.pointCountMax === this.pointCountMin) {
-                    color = this.options.fillStyle;
-                    size = this.options.minSize || 8;
-                } else {
-                    intensity = new Intensity({
-                        min: this.pointCountMin,
-                        max: this.pointCountMax,
-                        minSize: this.options.minSize || 8,
-                        maxSize: this.options.maxSize || 30,
-                        gradient: this.options.gradient
-                    });
-                }
-                for (var i = 0; i < clusterData.length; i++) {
-                    var item = clusterData[i];
-                    if (item.properties && item.properties.cluster_id) {
-                        clusterData[i].size = size || intensity.getSize(item.properties.point_count);
-                        clusterData[i].fillStyle = color || intensity.getColor(item.properties.point_count);
-                    } else {
-                        clusterData[i].size = self.options.size;
-                    }
-                }
-
-                this.clusterDataSet.set(clusterData);
-                this.transferToMercator(this.clusterDataSet);
-                data = self.clusterDataSet.get(dataGetOptions);
-            } else {
-                data = self.dataSet.get(dataGetOptions);
-            }
-
-            this.processData(data);
-
-            var nwPixel = map.pointToPixel(new BMap$3.Point(0, 0));
-
-            if (self.options.unit == 'm') {
-                if (self.options.size) {
-                    self.options._size = self.options.size / zoomUnit;
-                }
-                if (self.options.width) {
-                    self.options._width = self.options.width / zoomUnit;
-                }
-                if (self.options.height) {
-                    self.options._height = self.options.height / zoomUnit;
-                }
-            } else {
-                self.options._size = self.options.size;
-                self.options._height = self.options.height;
-                self.options._width = self.options.width;
-            }
-
-            this.drawContext(context, data, self.options, nwPixel);
-
-            //console.timeEnd('draw');
-
-            //console.timeEnd('update')
-            self.options.updateCallback && self.options.updateCallback(time);
-        }
-    }, {
-        key: 'init',
-        value: function init(options) {
-            var self = this;
-            self.options = options;
-            this.initDataRange(options);
-            this.context = self.options.context || '2d';
-
-            if (self.options.zIndex) {
-                this.canvasLayer && this.canvasLayer.setZIndex(self.options.zIndex);
-            }
-
-            if (self.options.max) {
-                this.intensity.setMax(self.options.max);
-            }
-
-            if (self.options.min) {
-                this.intensity.setMin(self.options.min);
-            }
-
-            this.initAnimator();
-            this.bindEvent();
-        }
-    }, {
-        key: 'getZoom',
-        value: function getZoom() {
-            return this.map.getZoom();
-        }
-    }, {
-        key: 'addAnimatorEvent',
-        value: function addAnimatorEvent() {
-            this.map.addEventListener('movestart', this.animatorMovestartEvent.bind(this));
-            this.map.addEventListener('moveend', this.animatorMoveendEvent.bind(this));
-        }
-    }, {
-        key: 'show',
-        value: function show() {
-            this.map.addOverlay(this.canvasLayer);
-            this.bindEvent();
-        }
-    }, {
-        key: 'hide',
-        value: function hide() {
-            this.unbindEvent();
-            this.map.removeOverlay(this.canvasLayer);
-        }
-    }, {
-        key: 'draw',
-        value: function draw() {
-            this.canvasLayer && this.canvasLayer.draw();
-        }
-    }, {
-        key: 'clearData',
-        value: function clearData() {
-            this.dataSet && this.dataSet.clear();
-            this.update({
-                options: null
-            });
-        }
-    }, {
-        key: 'destroy',
-        value: function destroy() {
-            this.unbindEvent();
-            this.clearData();
-            this.map.removeOverlay(this.canvasLayer);
-            this.canvasLayer = null;
-        }
-    }]);
-    return Layer;
-}(BaseLayer);
-
-/**
- * Copyright 2012 Google Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/**
- * @fileoverview Extends OverlayView to provide a canvas "Layer".
- * @author Brendan Kenny
- */
-
-/**
- * A map layer that provides a canvas over the slippy map and a callback
- * system for efficient animation. Requires canvas and CSS 2D transform
- * support.
- * @constructor
- * @extends google.maps.OverlayView
- * @param {CanvasLayerOptions=} opt_options Options to set in this CanvasLayer.
- */
-function CanvasLayer$2(opt_options) {
-  /**
-   * If true, canvas is in a map pane and the OverlayView is fully functional.
-   * See google.maps.OverlayView.onAdd for more information.
-   * @type {boolean}
-   * @private
-   */
-  this.isAdded_ = false;
-
-  /**
-   * If true, each update will immediately schedule the next.
-   * @type {boolean}
-   * @private
-   */
-  this.isAnimated_ = false;
-
-  /**
-   * The name of the MapPane in which this layer will be displayed.
-   * @type {string}
-   * @private
-   */
-  this.paneName_ = CanvasLayer$2.DEFAULT_PANE_NAME_;
-
-  /**
-   * A user-supplied function called whenever an update is required. Null or
-   * undefined if a callback is not provided.
-   * @type {?function=}
-   * @private
-   */
-  this.updateHandler_ = null;
-
-  /**
-   * A user-supplied function called whenever an update is required and the
-   * map has been resized since the last update. Null or undefined if a
-   * callback is not provided.
-   * @type {?function}
-   * @private
-   */
-  this.resizeHandler_ = null;
-
-  /**
-   * The LatLng coordinate of the top left of the current view of the map. Will
-   * be null when this.isAdded_ is false.
-   * @type {google.maps.LatLng}
-   * @private
-   */
-  this.topLeft_ = null;
-
-  /**
-   * The map-pan event listener. Will be null when this.isAdded_ is false. Will
-   * be null when this.isAdded_ is false.
-   * @type {?function}
-   * @private
-   */
-  this.centerListener_ = null;
-
-  /**
-   * The map-resize event listener. Will be null when this.isAdded_ is false.
-   * @type {?function}
-   * @private
-   */
-  this.resizeListener_ = null;
-
-  /**
-   * If true, the map size has changed and this.resizeHandler_ must be called
-   * on the next update.
-   * @type {boolean}
-   * @private
-   */
-  this.needsResize_ = true;
-
-  /**
-   * A browser-defined id for the currently requested callback. Null when no
-   * callback is queued.
-   * @type {?number}
-   * @private
-   */
-  this.requestAnimationFrameId_ = null;
-
-  var canvas = document.createElement('canvas');
-  canvas.style.position = 'absolute';
-  canvas.style.top = 0;
-  canvas.style.left = 0;
-  canvas.style.pointerEvents = 'none';
-
-  /**
-   * The canvas element.
-   * @type {!HTMLCanvasElement}
-   */
-  this.canvas = canvas;
-
-  /**
-   * The CSS width of the canvas, which may be different than the width of the
-   * backing store.
-   * @private {number}
-   */
-  this.canvasCssWidth_ = 300;
-
-  /**
-   * The CSS height of the canvas, which may be different than the height of
-   * the backing store.
-   * @private {number}
-   */
-  this.canvasCssHeight_ = 150;
-
-  /**
-   * A value for scaling the CanvasLayer resolution relative to the CanvasLayer
-   * display size.
-   * @private {number}
-   */
-  this.resolutionScale_ = 1;
-
-  /**
-   * Simple bind for functions with no args for bind-less browsers (Safari).
-   * @param {Object} thisArg The this value used for the target function.
-   * @param {function} func The function to be bound.
-   */
-  function simpleBindShim(thisArg, func) {
-    return function () {
-      func.apply(thisArg);
-    };
-  }
-
-  /**
-   * A reference to this.repositionCanvas_ with this bound as its this value.
-   * @type {function}
-   * @private
-   */
-  this.repositionFunction_ = simpleBindShim(this, this.repositionCanvas_);
-
-  /**
-   * A reference to this.resize_ with this bound as its this value.
-   * @type {function}
-   * @private
-   */
-  this.resizeFunction_ = simpleBindShim(this, this.resize_);
-
-  /**
-   * A reference to this.update_ with this bound as its this value.
-   * @type {function}
-   * @private
-   */
-  this.requestUpdateFunction_ = simpleBindShim(this, this.update_);
-
-  // set provided options, if any
-  if (opt_options) {
-    this.setOptions(opt_options);
-  }
-}
-
-var global$6 = typeof window === 'undefined' ? {} : window;
-
-if (global$6.google && global$6.google.maps) {
-
-  CanvasLayer$2.prototype = new google.maps.OverlayView();
-
-  /**
-   * The default MapPane to contain the canvas.
-   * @type {string}
-   * @const
-   * @private
-   */
-  CanvasLayer$2.DEFAULT_PANE_NAME_ = 'overlayLayer';
-
-  /**
-   * Transform CSS property name, with vendor prefix if required. If browser
-   * does not support transforms, property will be ignored.
-   * @type {string}
-   * @const
-   * @private
-   */
-  CanvasLayer$2.CSS_TRANSFORM_ = function () {
-    var div = document.createElement('div');
-    var transformProps = ['transform', 'WebkitTransform', 'MozTransform', 'OTransform', 'msTransform'];
-    for (var i = 0; i < transformProps.length; i++) {
-      var prop = transformProps[i];
-      if (div.style[prop] !== undefined) {
-        return prop;
-      }
-    }
-
-    // return unprefixed version by default
-    return transformProps[0];
-  }();
-
-  /**
-   * The requestAnimationFrame function, with vendor-prefixed or setTimeout-based
-   * fallbacks. MUST be called with window as thisArg.
-   * @type {function}
-   * @param {function} callback The function to add to the frame request queue.
-   * @return {number} The browser-defined id for the requested callback.
-   * @private
-   */
-  CanvasLayer$2.prototype.requestAnimFrame_ = global$6.requestAnimationFrame || global$6.webkitRequestAnimationFrame || global$6.mozRequestAnimationFrame || global$6.oRequestAnimationFrame || global$6.msRequestAnimationFrame || function (callback) {
-    return global$6.setTimeout(callback, 1000 / 60);
-  };
-
-  /**
-   * The cancelAnimationFrame function, with vendor-prefixed fallback. Does not
-   * fall back to clearTimeout as some platforms implement requestAnimationFrame
-   * but not cancelAnimationFrame, and the cost is an extra frame on onRemove.
-   * MUST be called with window as thisArg.
-   * @type {function}
-   * @param {number=} requestId The id of the frame request to cancel.
-   * @private
-   */
-  CanvasLayer$2.prototype.cancelAnimFrame_ = global$6.cancelAnimationFrame || global$6.webkitCancelAnimationFrame || global$6.mozCancelAnimationFrame || global$6.oCancelAnimationFrame || global$6.msCancelAnimationFrame || function (requestId) {};
-
-  /**
-   * Sets any options provided. See CanvasLayerOptions for more information.
-   * @param {CanvasLayerOptions} options The options to set.
-   */
-  CanvasLayer$2.prototype.setOptions = function (options) {
-    if (options.animate !== undefined) {
-      this.setAnimate(options.animate);
-    }
-
-    if (options.paneName !== undefined) {
-      this.setPaneName(options.paneName);
-    }
-
-    if (options.updateHandler !== undefined) {
-      this.setUpdateHandler(options.updateHandler);
-    }
-
-    if (options.resizeHandler !== undefined) {
-      this.setResizeHandler(options.resizeHandler);
-    }
-
-    if (options.resolutionScale !== undefined) {
-      this.setResolutionScale(options.resolutionScale);
-    }
-
-    if (options.map !== undefined) {
-      this.setMap(options.map);
-    }
-  };
-
-  /**
-   * Set the animated state of the layer. If true, updateHandler will be called
-   * repeatedly, once per frame. If false, updateHandler will only be called when
-   * a map property changes that could require the canvas content to be redrawn.
-   * @param {boolean} animate Whether the canvas is animated.
-   */
-  CanvasLayer$2.prototype.setAnimate = function (animate) {
-    this.isAnimated_ = !!animate;
-
-    if (this.isAnimated_) {
-      this.scheduleUpdate();
-    }
-  };
-
-  /**
-   * @return {boolean} Whether the canvas is animated.
-   */
-  CanvasLayer$2.prototype.isAnimated = function () {
-    return this.isAnimated_;
-  };
-
-  /**
-   * Set the MapPane in which this layer will be displayed, by name. See
-   * {@code google.maps.MapPanes} for the panes available.
-   * @param {string} paneName The name of the desired MapPane.
-   */
-  CanvasLayer$2.prototype.setPaneName = function (paneName) {
-    this.paneName_ = paneName;
-
-    this.setPane_();
-  };
-
-  /**
-   * @return {string} The name of the current container pane.
-   */
-  CanvasLayer$2.prototype.getPaneName = function () {
-    return this.paneName_;
-  };
-
-  /**
-   * Adds the canvas to the specified container pane. Since this is guaranteed to
-   * execute only after onAdd is called, this is when paneName's existence is
-   * checked (and an error is thrown if it doesn't exist).
-   * @private
-   */
-  CanvasLayer$2.prototype.setPane_ = function () {
-    if (!this.isAdded_) {
-      return;
-    }
-
-    // onAdd has been called, so panes can be used
-    var panes = this.getPanes();
-    if (!panes[this.paneName_]) {
-      throw new Error('"' + this.paneName_ + '" is not a valid MapPane name.');
-    }
-
-    panes[this.paneName_].appendChild(this.canvas);
-  };
-
-  /**
-   * Set a function that will be called whenever the parent map and the overlay's
-   * canvas have been resized. If opt_resizeHandler is null or unspecified, any
-   * existing callback is removed.
-   * @param {?function=} opt_resizeHandler The resize callback function.
-   */
-  CanvasLayer$2.prototype.setResizeHandler = function (opt_resizeHandler) {
-    this.resizeHandler_ = opt_resizeHandler;
-  };
-
-  /**
-   * Sets a value for scaling the canvas resolution relative to the canvas
-   * display size. This can be used to save computation by scaling the backing
-   * buffer down, or to support high DPI devices by scaling it up (by e.g.
-   * window.devicePixelRatio).
-   * @param {number} scale
-   */
-  CanvasLayer$2.prototype.setResolutionScale = function (scale) {
-    if (typeof scale === 'number') {
-      this.resolutionScale_ = scale;
-      this.resize_();
-    }
-  };
-
-  /**
-   * Set a function that will be called when a repaint of the canvas is required.
-   * If opt_updateHandler is null or unspecified, any existing callback is
-   * removed.
-   * @param {?function=} opt_updateHandler The update callback function.
-   */
-  CanvasLayer$2.prototype.setUpdateHandler = function (opt_updateHandler) {
-    this.updateHandler_ = opt_updateHandler;
-  };
-
-  /**
-   * @inheritDoc
-   */
-  CanvasLayer$2.prototype.onAdd = function () {
-    if (this.isAdded_) {
-      return;
-    }
-
-    this.isAdded_ = true;
-    this.setPane_();
-
-    this.resizeListener_ = google.maps.event.addListener(this.getMap(), 'resize', this.resizeFunction_);
-    this.centerListener_ = google.maps.event.addListener(this.getMap(), 'center_changed', this.repositionFunction_);
-
-    this.resize_();
-    this.repositionCanvas_();
-  };
-
-  /**
-   * @inheritDoc
-   */
-  CanvasLayer$2.prototype.onRemove = function () {
-    if (!this.isAdded_) {
-      return;
-    }
-
-    this.isAdded_ = false;
-    this.topLeft_ = null;
-
-    // remove canvas and listeners for pan and resize from map
-    this.canvas.parentElement.removeChild(this.canvas);
-    if (this.centerListener_) {
-      google.maps.event.removeListener(this.centerListener_);
-      this.centerListener_ = null;
-    }
-    if (this.resizeListener_) {
-      google.maps.event.removeListener(this.resizeListener_);
-      this.resizeListener_ = null;
-    }
-
-    // cease canvas update callbacks
-    if (this.requestAnimationFrameId_) {
-      this.cancelAnimFrame_.call(global$6, this.requestAnimationFrameId_);
-      this.requestAnimationFrameId_ = null;
-    }
-  };
-
-  /**
-   * The internal callback for resize events that resizes the canvas to keep the
-   * map properly covered.
-   * @private
-   */
-  CanvasLayer$2.prototype.resize_ = function () {
-    if (!this.isAdded_) {
-      return;
-    }
-
-    var map = this.getMap();
-    var mapWidth = map.getDiv().offsetWidth;
-    var mapHeight = map.getDiv().offsetHeight;
-
-    var newWidth = mapWidth * this.resolutionScale_;
-    var newHeight = mapHeight * this.resolutionScale_;
-    var oldWidth = this.canvas.width;
-    var oldHeight = this.canvas.height;
-
-    // resizing may allocate a new back buffer, so do so conservatively
-    if (oldWidth !== newWidth || oldHeight !== newHeight) {
-      this.canvas.width = newWidth;
-      this.canvas.height = newHeight;
-
-      this.needsResize_ = true;
-      this.scheduleUpdate();
-    }
-
-    // reset styling if new sizes don't match; resize of data not needed
-    if (this.canvasCssWidth_ !== mapWidth || this.canvasCssHeight_ !== mapHeight) {
-      this.canvasCssWidth_ = mapWidth;
-      this.canvasCssHeight_ = mapHeight;
-      this.canvas.style.width = mapWidth + 'px';
-      this.canvas.style.height = mapHeight + 'px';
-    }
-  };
-
-  /**
-   * @inheritDoc
-   */
-  CanvasLayer$2.prototype.draw = function () {
-    this.repositionCanvas_();
-  };
-
-  /**
-   * Internal callback for map view changes. Since the Maps API moves the overlay
-   * along with the map, this function calculates the opposite translation to
-   * keep the canvas in place.
-   * @private
-   */
-  CanvasLayer$2.prototype.repositionCanvas_ = function () {
-    // TODO(bckenny): *should* only be executed on RAF, but in current browsers
-    //     this causes noticeable hitches in map and overlay relative
-    //     positioning.
-
-    var map = this.getMap();
-
-    // topLeft can't be calculated from map.getBounds(), because bounds are
-    // clamped to -180 and 180 when completely zoomed out. Instead, calculate
-    // left as an offset from the center, which is an unwrapped LatLng.
-    var top = map.getBounds().getNorthEast().lat();
-    var center = map.getCenter();
-    var scale = Math.pow(2, map.getZoom());
-    var left = center.lng() - this.canvasCssWidth_ * 180 / (256 * scale);
-    this.topLeft_ = new google.maps.LatLng(top, left);
-
-    // Canvas position relative to draggable map's container depends on
-    // overlayView's projection, not the map's. Have to use the center of the
-    // map for this, not the top left, for the same reason as above.
-    var projection = this.getProjection();
-    var divCenter = projection.fromLatLngToDivPixel(center);
-    var offsetX = -Math.round(this.canvasCssWidth_ / 2 - divCenter.x);
-    var offsetY = -Math.round(this.canvasCssHeight_ / 2 - divCenter.y);
-    this.canvas.style[CanvasLayer$2.CSS_TRANSFORM_] = 'translate(' + offsetX + 'px,' + offsetY + 'px)';
-
-    this.scheduleUpdate();
-  };
-
-  /**
-   * Internal callback that serves as main animation scheduler via
-   * requestAnimationFrame. Calls resize and update callbacks if set, and
-   * schedules the next frame if overlay is animated.
-   * @private
-   */
-  CanvasLayer$2.prototype.update_ = function () {
-    this.requestAnimationFrameId_ = null;
-
-    if (!this.isAdded_) {
-      return;
-    }
-
-    if (this.isAnimated_) {
-      this.scheduleUpdate();
-    }
-
-    if (this.needsResize_ && this.resizeHandler_) {
-      this.needsResize_ = false;
-      this.resizeHandler_();
-    }
-
-    if (this.updateHandler_) {
-      this.updateHandler_();
-    }
-  };
-
-  /**
-   * A convenience method to get the current LatLng coordinate of the top left of
-   * the current view of the map.
-   * @return {google.maps.LatLng} The top left coordinate.
-   */
-  CanvasLayer$2.prototype.getTopLeft = function () {
-    return this.topLeft_;
-  };
-
-  /**
-   * Schedule a requestAnimationFrame callback to updateHandler. If one is
-   * already scheduled, there is no effect.
-   */
-  CanvasLayer$2.prototype.scheduleUpdate = function () {
-    if (this.isAdded_ && !this.requestAnimationFrameId_) {
-      this.requestAnimationFrameId_ = this.requestAnimFrame_.call(global$6, this.requestUpdateFunction_);
-    }
-  };
-}
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-var Layer$2 = function (_BaseLayer) {
-    inherits(Layer, _BaseLayer);
-
-    function Layer(map, dataSet, options) {
-        classCallCheck(this, Layer);
-
-        var _this = possibleConstructorReturn(this, (Layer.__proto__ || Object.getPrototypeOf(Layer)).call(this, map, dataSet, options));
-
-        var self = _this;
-        var data = null;
-        options = options || {};
-
-        self.init(options);
-        self.argCheck(options);
-
-        var canvasLayerOptions = {
-            map: map,
-            animate: false,
-            updateHandler: function updateHandler() {
-                self._canvasUpdate();
-            },
-            resolutionScale: resolutionScale
-        };
-
-        var canvasLayer = _this.canvasLayer = new CanvasLayer$2(canvasLayerOptions);
-
-        _this.clickEvent = _this.clickEvent.bind(_this);
-        _this.mousemoveEvent = _this.mousemoveEvent.bind(_this);
-        _this.bindEvent();
-        return _this;
-    }
-
-    createClass(Layer, [{
-        key: "clickEvent",
-        value: function clickEvent(e) {
-            var pixel = e.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), "clickEvent", this).call(this, pixel, e);
-        }
-    }, {
-        key: "mousemoveEvent",
-        value: function mousemoveEvent(e) {
-            var pixel = e.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), "mousemoveEvent", this).call(this, pixel, e);
-        }
-    }, {
-        key: "bindEvent",
-        value: function bindEvent(e) {
-            var map = this.map;
-
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.setDefaultCursor("default");
-                    map.addListener('click', this.clickEvent);
-                }
-                if (this.options.methods.mousemove) {
-                    map.addListener('mousemove', this.mousemoveEvent);
-                }
-            }
-        }
-    }, {
-        key: "unbindEvent",
-        value: function unbindEvent(e) {
-            var map = this.map;
-
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.removeListener('click', this.clickEvent);
-                }
-                if (this.options.methods.mousemove) {
-                    map.removeListener('mousemove', this.mousemoveEvent);
-                }
-            }
-        }
-    }, {
-        key: "getContext",
-        value: function getContext() {
-            return this.canvasLayer.canvas.getContext(this.context);
-        }
-    }, {
-        key: "_canvasUpdate",
-        value: function _canvasUpdate(time) {
-            if (!this.canvasLayer) {
-                return;
-            }
-
-            var self = this;
-
-            var animationOptions = self.options.animation;
-
-            var context = this.getContext();
-
-            if (self.isEnabledTime()) {
-                if (time === undefined) {
-                    clear(context);
-                    return;
-                }
-                if (this.context == '2d') {
-                    context.save();
-                    context.globalCompositeOperation = 'destination-out';
-                    context.fillStyle = 'rgba(0, 0, 0, .1)';
-                    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-                    context.restore();
-                }
-            } else {
-                clear(context);
-            }
-
-            if (this.context == '2d') {
-                for (var key in self.options) {
-                    context[key] = self.options[key];
-                }
-            } else {
-                context.clear(context.COLOR_BUFFER_BIT);
-            }
-
-            if (self.options.minZoom && map.getZoom() < self.options.minZoom || self.options.maxZoom && map.getZoom() > self.options.maxZoom) {
-                return;
-            }
-
-            var scale = 1;
-            if (this.context != '2d') {
-                scale = this.canvasLayer.devicePixelRatio;
-            }
-
-            var map = this.map;
-            var mapProjection = map.getProjection();
-            var scale = Math.pow(2, map.zoom) * resolutionScale;
-            var offset = mapProjection.fromLatLngToPoint(this.canvasLayer.getTopLeft());
-            var dataGetOptions = {
-                //fromColumn: self.options.coordType == 'bd09mc' ? 'coordinates' : 'coordinates_mercator',
-                transferCoordinate: function transferCoordinate(coordinate) {
-                    var latLng = new google.maps.LatLng(coordinate[1], coordinate[0]);
-                    var worldPoint = mapProjection.fromLatLngToPoint(latLng);
-                    var pixel = {
-                        x: (worldPoint.x - offset.x) * scale,
-                        y: (worldPoint.y - offset.y) * scale
-                    };
-                    return [pixel.x, pixel.y];
-                }
-            };
-
-            if (time !== undefined) {
-                dataGetOptions.filter = function (item) {
-                    var trails = animationOptions.trails || 10;
-                    if (time && item.time > time - trails && item.time < time) {
-                        return true;
-                    } else {
-                        return false;
-                    }
-                };
-            }
-
-            // get data from data set
-            var data = self.dataSet.get(dataGetOptions);
-
-            this.processData(data);
-
-            var latLng = new google.maps.LatLng(0, 0);
-            var worldPoint = mapProjection.fromLatLngToPoint(latLng);
-            var pixel = {
-                x: (worldPoint.x - offset.x) * scale,
-                y: (worldPoint.y - offset.y) * scale
-            };
-
-            if (self.options.unit == 'm' && self.options.size) {
-                self.options._size = self.options.size / zoomUnit;
-            } else {
-                self.options._size = self.options.size;
-            }
-
-            this.drawContext(context, new DataSet(data), self.options, pixel);
-
-            //console.timeEnd('draw');
-
-            //console.timeEnd('update')
-            self.options.updateCallback && self.options.updateCallback(time);
-        }
-    }, {
-        key: "init",
-        value: function init(options) {
-
-            var self = this;
-
-            self.options = options;
-
-            this.initDataRange(options);
-
-            this.context = self.options.context || '2d';
-
-            if (self.options.zIndex) {
-                this.canvasLayer && this.canvasLayer.setZIndex(self.options.zIndex);
-            }
-
-            this.initAnimator();
-        }
-    }, {
-        key: "addAnimatorEvent",
-        value: function addAnimatorEvent() {
-            this.map.addListener('movestart', this.animatorMovestartEvent.bind(this));
-            this.map.addListener('moveend', this.animatorMoveendEvent.bind(this));
-        }
-    }, {
-        key: "show",
-        value: function show() {
-            this.map.addOverlay(this.canvasLayer);
-        }
-    }, {
-        key: "hide",
-        value: function hide() {
-            this.map.removeOverlay(this.canvasLayer);
-        }
-    }, {
-        key: "draw",
-        value: function draw() {
-            self.canvasLayer.draw();
-        }
-    }]);
-    return Layer;
-}(BaseLayer);
-
-/**
- * MapV for maptalks.js (https://github.com/maptalks/maptalks.js)
- * @author fuzhenn / https://github.com/fuzhenn
- */
-// import * as maptalks from 'maptalks';
-var Layer$4 = void 0;
-if (typeof maptalks !== 'undefined') {
-    Layer$4 = function (_maptalks$Layer) {
-        inherits(Layer, _maptalks$Layer);
-
-        function Layer(id, dataSet, options) {
-            classCallCheck(this, Layer);
-
-            var _this = possibleConstructorReturn(this, (Layer.__proto__ || Object.getPrototypeOf(Layer)).call(this, id, options));
-
-            _this.options_ = options;
-            _this.dataSet = dataSet;
-            _this._initBaseLayer(options);
-            return _this;
-        }
-
-        createClass(Layer, [{
-            key: "_initBaseLayer",
-            value: function _initBaseLayer(options) {
-                var self = this;
-                var baseLayer = this.baseLayer = new BaseLayer(null, this.dataSet, options);
-                self.init(options);
-                baseLayer.argCheck(options);
-            }
-        }, {
-            key: "clickEvent",
-            value: function clickEvent(e) {
-                if (!this.baseLayer) {
-                    return;
-                }
-                var pixel = e.containerPoint;
-                this.baseLayer.clickEvent(pixel, e.domEvent);
-            }
-        }, {
-            key: "mousemoveEvent",
-            value: function mousemoveEvent(e) {
-                if (!this.baseLayer) {
-                    return;
-                }
-                var pixel = e.containerPoint;
-                this.baseLayer.mousemoveEvent(pixel, e.domEvent);
-            }
-        }, {
-            key: "getEvents",
-            value: function getEvents() {
-                return {
-                    'click': this.clickEvent,
-                    'mousemove': this.mousemoveEvent
-                };
-            }
-        }, {
-            key: "init",
-            value: function init(options) {
-
-                var base = this.baseLayer;
-
-                base.options = options;
-
-                base.initDataRange(options);
-
-                base.context = base.options.context || '2d';
-
-                base.initAnimator();
-            }
-        }, {
-            key: "addAnimatorEvent",
-            value: function addAnimatorEvent() {
-                this.map.addListener('movestart', this.animatorMovestartEvent.bind(this));
-                this.map.addListener('moveend', this.animatorMoveendEvent.bind(this));
-            }
-        }]);
-        return Layer;
-    }(maptalks.Layer);
-
-    var LayerRenderer = function (_maptalks$renderer$Ca) {
-        inherits(LayerRenderer, _maptalks$renderer$Ca);
-
-        function LayerRenderer() {
-            classCallCheck(this, LayerRenderer);
-            return possibleConstructorReturn(this, (LayerRenderer.__proto__ || Object.getPrototypeOf(LayerRenderer)).apply(this, arguments));
-        }
-
-        createClass(LayerRenderer, [{
-            key: "needToRedraw",
-            value: function needToRedraw() {
-                var base = this.layer.baseLayer;
-                if (base.isEnabledTime()) {
-                    return true;
-                }
-                return get(LayerRenderer.prototype.__proto__ || Object.getPrototypeOf(LayerRenderer.prototype), "needToRedraw", this).call(this);
-            }
-        }, {
-            key: "draw",
-            value: function draw() {
-                var base = this.layer.baseLayer;
-                if (!this.canvas || !base.isEnabledTime() || this._shouldClear) {
-                    this.prepareCanvas();
-                    this._shouldClear = false;
-                }
-                this._update(this.gl || this.context, this._mapvFrameTime);
-                delete this._mapvFrameTime;
-                this.completeRender();
-            }
-        }, {
-            key: "drawOnInteracting",
-            value: function drawOnInteracting() {
-                this.draw();
-                this._shouldClear = false;
-            }
-        }, {
-            key: "onSkipDrawOnInteracting",
-            value: function onSkipDrawOnInteracting() {
-                this._shouldClear = true;
-            }
-        }, {
-            key: "_canvasUpdate",
-            value: function _canvasUpdate(time) {
-                this.setToRedraw();
-                this._mapvFrameTime = time;
-            }
-        }, {
-            key: "_update",
-            value: function _update(context, time) {
-                if (!this.canvas) {
-                    return;
-                }
-
-                var self = this.layer.baseLayer;
-
-                var animationOptions = self.options.animation;
-
-                var map = this.getMap();
-
-                if (self.isEnabledTime()) {
-                    if (time === undefined) {
-                        clear(context);
-                        return;
-                    }
-                    if (self.context == '2d') {
-                        context.save();
-                        context.globalCompositeOperation = 'destination-out';
-                        context.fillStyle = 'rgba(0, 0, 0, .1)';
-                        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-                        context.restore();
-                    }
-                } else {
-                    clear(context);
-                }
-
-                if (self.context == '2d') {
-                    for (var key in self.options) {
-                        context[key] = self.options[key];
-                    }
-                } else {
-                    context.clear(context.COLOR_BUFFER_BIT);
-                }
-
-                var scale = 1;
-
-                //reuse to save coordinate instance creation
-                var coord = new maptalks.Coordinate(0, 0);
-                var dataGetOptions = {
-                    fromColumn: self.options.coordType === 'bd09mc' ? 'coordinates_mercator' : 'coordinates',
-                    transferCoordinate: function transferCoordinate(coordinate) {
-                        coord.x = coordinate[0];
-                        coord.y = coordinate[1];
-                        var r = map.coordToContainerPoint(coord)._multi(scale).toArray();
-                        return r;
-                    }
-                };
-
-                if (time !== undefined) {
-                    dataGetOptions.filter = function (item) {
-                        var trails = animationOptions.trails || 10;
-                        if (time && item.time > time - trails && item.time < time) {
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    };
-                }
-
-                // get data from data set
-                var data = self.dataSet.get(dataGetOptions);
-
-                self.processData(data);
-
-                if (self.options.unit == 'm') {
-                    if (self.options.size) {
-                        self.options._size = self.options.size / zoomUnit;
-                    }
-                    if (self.options.width) {
-                        self.options._width = self.options.width / zoomUnit;
-                    }
-                    if (self.options.height) {
-                        self.options._height = self.options.height / zoomUnit;
-                    }
-                } else {
-                    self.options._size = self.options.size;
-                    self.options._height = self.options.height;
-                    self.options._width = self.options.width;
-                }
-
-                var zeroZero = new maptalks.Point(0, 0);
-                //screen position of the [0, 0] point
-                var zeroZeroScreen = map._pointToContainerPoint(zeroZero)._multi(scale);
-                self.drawContext(context, data, self.options, zeroZeroScreen);
-
-                //console.timeEnd('draw');
-
-                //console.timeEnd('update')
-                self.options.updateCallback && self.options.updateCallback(time);
-            }
-        }, {
-            key: "createCanvas",
-            value: function createCanvas() {
-                if (this.canvas) {
-                    return;
-                }
-                var map = this.getMap();
-                var size = map.getSize();
-                var r = map.getDevicePixelRatio ? map.getDevicePixelRatio() : maptalks.Browser.retina ? 2 : 1,
-                    w = r * size.width,
-                    h = r * size.height;
-                this.canvas = maptalks.Canvas.createCanvas(w, h, map.CanvasClass);
-                var mapvContext = this.layer.baseLayer.context;
-                if (mapvContext === '2d') {
-                    this.context = this.canvas.getContext('2d');
-                    if (this.layer.options['globalCompositeOperation']) {
-                        this.context.globalCompositeOperation = this.layer.options['globalCompositeOperation'];
-                    }
-                    if (this.layer.baseLayer.options.draw !== 'heatmap' && r !== 1) {
-                        //in heatmap.js, devicePixelRatio is being mulitplied independently
-                        this.context.scale(r, r);
-                    }
-                } else {
-                    var attributes = {
-                        'alpha': true,
-                        'preserveDrawingBuffer': true,
-                        'antialias': false
-                    };
-                    this.gl = this.canvas.getContext('webgl', attributes);
-                }
-
-                this.onCanvasCreate();
-
-                this._bindToMapv();
-
-                this.layer.fire('canvascreate', {
-                    'context': this.context,
-                    'gl': this.gl
-                });
-            }
-        }, {
-            key: "_bindToMapv",
-            value: function _bindToMapv() {
-                //some bindings needed by mapv baselayer
-                var base = this.layer.baseLayer;
-                var map = this.getMap();
-                this.devicePixelRatio = map.getDevicePixelRatio ? map.getDevicePixelRatio() : maptalks.Browser.retina ? 2 : 1;
-                base.canvasLayer = this;
-                base._canvasUpdate = this._canvasUpdate.bind(this);
-                base.getContext = function () {
-                    var renderer = self.getRenderer();
-                    return renderer.gl || renderer.context;
-                };
-            }
-        }]);
-        return LayerRenderer;
-    }(maptalks.renderer.CanvasRenderer);
-
-    Layer$4.registerRenderer('canvas', LayerRenderer);
-}
-
-var Layer$5 = Layer$4;
-
-/**
- * MapV for AMap
- * @author sakitam-fdd - https://github.com/sakitam-fdd
- */
-
-/**
- * create canvas
- * @param width
- * @param height
- * @param Canvas
- * @returns {HTMLCanvasElement}
- */
-var createCanvas = function createCanvas(width, height, Canvas) {
-    if (typeof document !== 'undefined') {
-        var canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        return canvas;
-    } else {
-        // create a new canvas instance in node.js
-        // the canvas class needs to have a default constructor without any parameter
-        return new Canvas(width, height);
-    }
-};
-
-var Layer$6 = function (_BaseLayer) {
-    inherits(Layer, _BaseLayer);
-
-    function Layer() {
-        var map = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
-        var dataSet = arguments[1];
-        var options = arguments[2];
-        classCallCheck(this, Layer);
-
-        var _this = possibleConstructorReturn(this, (Layer.__proto__ || Object.getPrototypeOf(Layer)).call(this, map, dataSet, options));
-
-        _this.options = options;
-
-        /**
-         * internal
-         * @type {{canvas: null, devicePixelRatio: number}}
-         */
-        _this.canvasLayer = {
-            canvas: null,
-            devicePixelRatio: window.devicePixelRatio
-        };
-
-        /**
-         * canvas layer
-         * @type {null}
-         * @private
-         */
-        _this.layer_ = null;
-
-        _this.initDataRange(options);
-        _this.initAnimator();
-        _this.onEvents();
-        map.on('complete', function () {
-            this.init(map, options);
-            this.argCheck(options);
-        }, _this);
-        return _this;
-    }
-
-    /**
-     * init mapv layer
-     * @param map
-     * @param options
-     */
-
-
-    createClass(Layer, [{
-        key: "init",
-        value: function init(map, options) {
-            if (map) {
-                this.map = map;
-                this.context = this.options.context || '2d';
-                this.getCanvasLayer();
-            } else {
-                throw new Error('not map object');
-            }
-        }
-
-        /**
-         * update layer
-         * @param time
-         * @private
-         */
-
-    }, {
-        key: "_canvasUpdate",
-        value: function _canvasUpdate(time) {
-            this.render(this.canvasLayer.canvas, time);
-        }
-
-        /**
-         * render layer
-         * @param canvas
-         * @param time
-         * @returns {Layer}
-         */
-
-    }, {
-        key: "render",
-        value: function render(canvas, time) {
-            if (!canvas) return;
-            var map = this.map;
-            var context = canvas.getContext(this.context);
-            var animationOptions = this.options.animation;
-            if (this.isEnabledTime()) {
-                if (time === undefined) {
-                    clear(context);
-                    return this;
-                }
-                if (this.context === '2d') {
-                    context.save();
-                    context.globalCompositeOperation = 'destination-out';
-                    context.fillStyle = 'rgba(0, 0, 0, .1)';
-                    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-                    context.restore();
-                }
-            } else {
-                clear(context);
-            }
-
-            if (this.context === '2d') {
-                for (var key in this.options) {
-                    context[key] = this.options[key];
-                }
-            } else {
-                context.clear(context.COLOR_BUFFER_BIT);
-            }
-            var dataGetOptions = {
-                transferCoordinate: function transferCoordinate(coordinate) {
-                    var _pixel = map.lngLatToContainer(new AMap.LngLat(coordinate[0], coordinate[1]));
-                    return [_pixel['x'], _pixel['y']];
-                }
-            };
-
-            if (time !== undefined) {
-                dataGetOptions.filter = function (item) {
-                    var trails = animationOptions.trails || 10;
-                    if (time && item.time > time - trails && item.time < time) {
-                        return true;
-                    } else {
-                        return false;
-                    }
-                };
-            }
-
-            var data = this.dataSet.get(dataGetOptions);
-            this.processData(data);
-
-            if (this.options.unit === 'm') {
-                if (this.options.size) {
-                    this.options._size = this.options.size / zoomUnit;
-                }
-                if (this.options.width) {
-                    this.options._width = this.options.width / zoomUnit;
-                }
-                if (this.options.height) {
-                    this.options._height = this.options.height / zoomUnit;
-                }
-            } else {
-                this.options._size = this.options.size;
-                this.options._height = this.options.height;
-                this.options._width = this.options.width;
-            }
-
-            this.drawContext(context, new DataSet(data), this.options, { x: 0, y: 0 });
-            this.options.updateCallback && this.options.updateCallback(time);
-            return this;
-        }
-
-        /**
-         * get canvas layer
-         */
-
-    }, {
-        key: "getCanvasLayer",
-        value: function getCanvasLayer() {
-            if (!this.canvasLayer.canvas && !this.layer_) {
-                var canvas = this.canvasFunction();
-                var bounds = this.map.getBounds();
-                this.layer_ = new AMap.CanvasLayer({
-                    canvas: canvas,
-                    bounds: this.options.bounds || bounds,
-                    zooms: this.options.zooms || [0, 22]
-                });
-                this.layer_.setMap(this.map);
-                this.map.on('mapmove', this.canvasFunction, this);
-                this.map.on('zoomchange', this.canvasFunction, this);
-            }
-        }
-
-        /**
-         * canvas constructor
-         * @returns {*}
-         */
-
-    }, {
-        key: "canvasFunction",
-        value: function canvasFunction() {
-            var _ref = [this.map.getSize().width, this.map.getSize().height],
-                width = _ref[0],
-                height = _ref[1];
-
-            if (!this.canvasLayer.canvas) {
-                this.canvasLayer.canvas = createCanvas(width, height);
-            } else {
-                this.canvasLayer.canvas.width = width;
-                this.canvasLayer.canvas.height = height;
-                var bounds = this.map.getBounds();
-                if (this.layer_) {
-                    this.layer_.setBounds(this.options.bounds || bounds);
-                }
-            }
-            this.render(this.canvasLayer.canvas);
-            return this.canvasLayer.canvas;
-        }
-
-        /**
-         * remove layer
-         */
-
-    }, {
-        key: "removeLayer",
-        value: function removeLayer() {
-            if (!this.map) return;
-            this.unEvents();
-            this.map.removeLayer(this.layer_);
-            delete this.map;
-            delete this.layer_;
-            delete this.canvasLayer.canvas;
-        }
-    }, {
-        key: "getContext",
-        value: function getContext() {
-            return this.canvasLayer.canvas.getContext(this.context);
-        }
-
-        /**
-         * handle click event
-         * @param event
-         */
-
-    }, {
-        key: "clickEvent",
-        value: function clickEvent(event) {
-            var pixel = event.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), "clickEvent", this).call(this, pixel, event);
-        }
-
-        /**
-         * handle mousemove/pointermove event
-         * @param event
-         */
-
-    }, {
-        key: "mousemoveEvent",
-        value: function mousemoveEvent(event) {
-            var pixel = event.pixel;
-            get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), "mousemoveEvent", this).call(this, pixel, event);
-        }
-
-        /**
-         * add animator event
-         */
-
-    }, {
-        key: "addAnimatorEvent",
-        value: function addAnimatorEvent() {
-            this.map.on('movestart', this.animatorMovestartEvent, this);
-            this.map.on('moveend', this.animatorMoveendEvent, this);
-        }
-
-        /**
-         * bind event
-         */
-
-    }, {
-        key: "onEvents",
-        value: function onEvents() {
-            var map = this.map;
-            this.unEvents();
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.on('click', this.clickEvent, this);
-                }
-                if (this.options.methods.mousemove) {
-                    map.on('mousemove', this.mousemoveEvent, this);
-                }
-            }
-        }
-
-        /**
-         * unbind events
-         */
-
-    }, {
-        key: "unEvents",
-        value: function unEvents() {
-            var map = this.map;
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.off('click', this.clickEvent, this);
-                }
-                if (this.options.methods.mousemove) {
-                    map.off('mousemove', this.mousemoveEvent, this);
-                }
-            }
-        }
-    }]);
-    return Layer;
-}(BaseLayer);
-
-/**
- * MapV for openlayers (https://openlayers.org)
- * @author sakitam-fdd - https://github.com/sakitam-fdd
- */
-
-/**
- * create canvas
- * @param width
- * @param height
- * @returns {HTMLCanvasElement}
- */
-var createCanvas$1 = function createCanvas(width, height) {
-  if (typeof document !== 'undefined') {
-    var canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    return canvas;
-  } else {
-    // create a new canvas instance in node.js
-    // the canvas class needs to have a default constructor without any parameter
-  }
-};
-
-var Layer$8 = function (_BaseLayer) {
-  inherits(Layer, _BaseLayer);
-
-  function Layer() {
-    var map = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
-    var dataSet = arguments[1];
-    var options = arguments[2];
-    classCallCheck(this, Layer);
-
-    var _this = possibleConstructorReturn(this, (Layer.__proto__ || Object.getPrototypeOf(Layer)).call(this, map, dataSet, options));
-
-    _this.options = options;
-
-    /**
-     * internal
-     * @type {{canvas: null, devicePixelRatio: number}}
-     */
-    _this.canvasLayer = {
-      canvas: null,
-      devicePixelRatio: window.devicePixelRatio
-
-      /**
-       * cavnas layer
-       * @type {null}
-       * @private
-       */
-    };_this.layer_ = null;
-
-    /**
-     * previous cursor
-     * @type {undefined}
-     * @private
-     */
-    _this.previousCursor_ = undefined;
-
-    _this.init(map, options);
-    _this.argCheck(options);
-    return _this;
-  }
-
-  /**
-   * init mapv layer
-   * @param map
-   * @param options
-   */
-
-
-  createClass(Layer, [{
-    key: "init",
-    value: function init(map, options) {
-      if (map && map instanceof ol.Map) {
-        this.$Map = map;
-        this.context = this.options.context || '2d';
-        this.getCanvasLayer();
-        this.initDataRange(options);
-        this.initAnimator();
-        this.onEvents();
-      } else {
-        throw new Error('not map object');
-      }
-    }
-
-    /**
-     * update layer
-     * @param time
-     * @private
-     */
-
-  }, {
-    key: "_canvasUpdate",
-    value: function _canvasUpdate(time) {
-      this.render(this.canvasLayer.canvas, time);
-    }
-
-    /**
-     * render layer
-     * @param canvas
-     * @param time
-     * @returns {Layer}
-     */
-
-  }, {
-    key: "render",
-    value: function render(canvas, time) {
-      var map = this.$Map;
-      var context = canvas.getContext(this.context);
-      var animationOptions = this.options.animation;
-      var _projection = this.options.hasOwnProperty('projection') ? this.options.projection : 'EPSG:4326';
-      var mapViewProjection = this.$Map.getView().getProjection().getCode();
-      if (this.isEnabledTime()) {
-        if (time === undefined) {
-          clear(context);
-          return this;
-        }
-        if (this.context === '2d') {
-          context.save();
-          context.globalCompositeOperation = 'destination-out';
-          context.fillStyle = 'rgba(0, 0, 0, .1)';
-          context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-          context.restore();
-        }
-      } else {
-        clear(context);
-      }
-
-      if (this.context === '2d') {
-        for (var key in this.options) {
-          context[key] = this.options[key];
-        }
-      } else {
-        context.clear(context.COLOR_BUFFER_BIT);
-      }
-      var dataGetOptions = {};
-      dataGetOptions.transferCoordinate = _projection === mapViewProjection ? function (coordinate) {
-        // 当数据与map的投影一致时不再进行投影转换
-        return map.getPixelFromCoordinate(coordinate);
-      } : function (coordinate) {
-        // 数据与Map投影不一致时 将数据投影转换为 Map的投影
-        return map.getPixelFromCoordinate(ol.proj.transform(coordinate, _projection, mapViewProjection));
-      };
-
-      if (time !== undefined) {
-        dataGetOptions.filter = function (item) {
-          var trails = animationOptions.trails || 10;
-          if (time && item.time > time - trails && item.time < time) {
-            return true;
-          } else {
-            return false;
-          }
-        };
-      }
-
-      var data = this.dataSet.get(dataGetOptions);
-      this.processData(data);
-
-      if (this.options.unit === 'm') {
-        if (this.options.size) {
-          this.options._size = this.options.size / zoomUnit;
-        }
-        if (this.options.width) {
-          this.options._width = this.options.width / zoomUnit;
-        }
-        if (this.options.height) {
-          this.options._height = this.options.height / zoomUnit;
-        }
-      } else {
-        this.options._size = this.options.size;
-        this.options._height = this.options.height;
-        this.options._width = this.options.width;
-      }
-
-      this.drawContext(context, new DataSet(data), this.options, { x: 0, y: 0 });
-      this.options.updateCallback && this.options.updateCallback(time);
-      return this;
-    }
-
-    /**
-     * get canvas layer
-     */
-
-  }, {
-    key: "getCanvasLayer",
-    value: function getCanvasLayer() {
-      if (!this.canvasLayer.canvas && !this.layer_) {
-        var extent = this.getMapExtent();
-        this.layer_ = new ol.layer.Image({
-          layerName: this.options.layerName,
-          minResolution: this.options.minResolution,
-          maxResolution: this.options.maxResolution,
-          zIndex: this.options.zIndex,
-          extent: extent,
-          source: new ol.source.ImageCanvas({
-            canvasFunction: this.canvasFunction.bind(this),
-            projection: this.$Map.getView().getProjection().getCode(), // 图层投影与Map保持一致
-            ratio: this.options.hasOwnProperty('ratio') ? this.options.ratio : 1
-          })
-        });
-        this.$Map.addLayer(this.layer_);
-        this.$Map.un('precompose', this.reRender, this);
-        this.$Map.on('precompose', this.reRender, this);
-      }
-    }
-
-    /**
-     * re render
-     */
-
-  }, {
-    key: "reRender",
-    value: function reRender() {
-      if (!this.layer_) return;
-      var extent = this.getMapExtent();
-      this.layer_.setExtent(extent);
-    }
-
-    /**
-     * canvas constructor
-     * @param extent
-     * @param resolution
-     * @param pixelRatio
-     * @param size
-     * @param projection
-     * @returns {*}
-     */
-
-  }, {
-    key: "canvasFunction",
-    value: function canvasFunction(extent, resolution, pixelRatio, size, projection) {
-      if (!this.canvasLayer.canvas) {
-        this.canvasLayer.canvas = createCanvas$1(size[0], size[1]);
-      } else {
-        this.canvasLayer.canvas.width = size[0];
-        this.canvasLayer.canvas.height = size[1];
-      }
-      this.render(this.canvasLayer.canvas);
-      return this.canvasLayer.canvas;
-    }
-
-    /**
-     * get map current extent
-     * @returns {Array}
-     */
-
-  }, {
-    key: "getMapExtent",
-    value: function getMapExtent() {
-      var size = this.$Map.getSize();
-      return this.$Map.getView().calculateExtent(size);
-    }
-
-    /**
-     * add layer to map
-     * @param map
-     */
-
-  }, {
-    key: "addTo",
-    value: function addTo(map) {
-      this.init(map, this.options);
-    }
-
-    /**
-     * remove layer
-     */
-
-  }, {
-    key: "removeLayer",
-    value: function removeLayer() {
-      if (!this.$Map) return;
-      this.unEvents();
-      this.$Map.un('precompose', this.reRender, this);
-      this.$Map.removeLayer(this.layer_);
-      delete this.$Map;
-      delete this.layer_;
-      delete this.canvasLayer.canvas;
-    }
-  }, {
-    key: "getContext",
-    value: function getContext() {
-      return this.canvasLayer.canvas.getContext(this.context);
-    }
-
-    /**
-     * handle click event
-     * @param event
-     */
-
-  }, {
-    key: "clickEvent",
-    value: function clickEvent(event) {
-      var pixel = event.pixel;
-      get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), "clickEvent", this).call(this, {
-        x: pixel[0],
-        y: pixel[1]
-      }, event);
-    }
-
-    /**
-     * handle mousemove/pointermove event
-     * @param event
-     */
-
-  }, {
-    key: "mousemoveEvent",
-    value: function mousemoveEvent(event) {
-      var pixel = event.pixel;
-      get(Layer.prototype.__proto__ || Object.getPrototypeOf(Layer.prototype), "mousemoveEvent", this).call(this, {
-        x: pixel[0],
-        y: pixel[1]
-      }, event);
-    }
-
-    /**
-     * add animator event
-     */
-
-  }, {
-    key: "addAnimatorEvent",
-    value: function addAnimatorEvent() {
-      this.$Map.on('movestart', this.animatorMovestartEvent, this);
-      this.$Map.on('moveend', this.animatorMoveendEvent, this);
-    }
-
-    /**
-     * bind event
-     */
-
-  }, {
-    key: "onEvents",
-    value: function onEvents() {
-      var map = this.$Map;
-      this.unEvents();
-      if (this.options.methods) {
-        if (this.options.methods.click) {
-          map.on('click', this.clickEvent, this);
-        }
-        if (this.options.methods.mousemove) {
-          map.on('pointermove', this.mousemoveEvent, this);
-        }
-      }
-    }
-
-    /**
-     * unbind events
-     */
-
-  }, {
-    key: "unEvents",
-    value: function unEvents() {
-      var map = this.$Map;
-      if (this.options.methods) {
-        if (this.options.methods.click) {
-          map.un('click', this.clickEvent, this);
-        }
-        if (this.options.methods.pointermove) {
-          map.un('pointermove', this.mousemoveEvent, this);
-        }
-      }
-    }
-
-    /**
-     * set map cursor
-     * @param cursor
-     * @param feature
-     */
-
-  }, {
-    key: "setDefaultCursor",
-    value: function setDefaultCursor(cursor, feature) {
-      if (!this.$Map) return;
-      var element = this.$Map.getTargetElement();
-      if (feature) {
-        if (element.style.cursor !== cursor) {
-          this.previousCursor_ = element.style.cursor;
-          element.style.cursor = cursor;
-        }
-      } else if (this.previousCursor_ !== undefined) {
-        element.style.cursor = this.previousCursor_;
-        this.previousCursor_ = undefined;
-      }
-    }
-
-    /**
-     * 显示图层
-     */
-
-  }, {
-    key: "show",
-    value: function show() {
-      this.$Map.addLayer(this.layer_);
-    }
-
-    /**
-     * 隐藏图层
-     */
-
-  }, {
-    key: "hide",
-    value: function hide() {
-      this.$Map.removeLayer(this.layer_);
-    }
-  }]);
-  return Layer;
-}(BaseLayer);
-
-// https://github.com/SuperMap/iClient-JavaScript
-/**
- * @class MapVRenderer
- * @classdesc 地图渲染类。
- * @category Visualization MapV
- * @private
- * @extends mapv.BaseLayer
- * @param {L.Map} map - 待渲染的地图。
- * @param {L.Layer} layer - 待渲染的图层。
- * @param {DataSet} dataSet - 待渲染的数据集。
- * @param {Object} options - 渲染的参数。
- */
 var MapVRenderer = function (_BaseLayer) {
-    inherits(MapVRenderer, _BaseLayer);
-
-    function MapVRenderer(map, layer, dataSet, options) {
-        classCallCheck(this, MapVRenderer);
-
-        var _this = possibleConstructorReturn(this, (MapVRenderer.__proto__ || Object.getPrototypeOf(MapVRenderer)).call(this, map, dataSet, options));
-
-        if (!BaseLayer) {
-            return possibleConstructorReturn(_this);
-        }
-
-        var self = _this;
-        options = options || {};
-
-        self.init(options);
-        self.argCheck(options);
-        _this.canvasLayer = layer;
-        _this.clickEvent = _this.clickEvent.bind(_this);
-        _this.mousemoveEvent = _this.mousemoveEvent.bind(_this);
-        _this._moveStartEvent = _this.moveStartEvent.bind(_this);
-        _this._moveEndEvent = _this.moveEndEvent.bind(_this);
-        _this._zoomStartEvent = _this.zoomStartEvent.bind(_this);
-        _this.bindEvent();
-        return _this;
-    }
-
-    /**
-     * @function MapVRenderer.prototype.clickEvent
-     * @description 点击事件。
-     * @param {Object} e - 触发对象。
-     */
-
-
-    createClass(MapVRenderer, [{
-        key: 'clickEvent',
-        value: function clickEvent(e) {
-            var offset = this.map.containerPointToLayerPoint([0, 0]);
-            var devicePixelRatio = this.devicePixelRatio = this.canvasLayer.devicePixelRatio = window.devicePixelRatio;
-            var pixel = e.layerPoint;
-            get(MapVRenderer.prototype.__proto__ || Object.getPrototypeOf(MapVRenderer.prototype), 'clickEvent', this).call(this, L.point((pixel.x - offset.x) / devicePixelRatio, (pixel.y - offset.y) / devicePixelRatio), e);
-        }
-
-        /**
-         * @function MapVRenderer.prototype.mousemoveEvent
-         * @description 鼠标移动事件。
-         * @param {Object} e - 触发对象。
-         */
-
-    }, {
-        key: 'mousemoveEvent',
-        value: function mousemoveEvent(e) {
-            var pixel = e.layerPoint;
-            get(MapVRenderer.prototype.__proto__ || Object.getPrototypeOf(MapVRenderer.prototype), 'mousemoveEvent', this).call(this, pixel, e);
-        }
-
-        /**
-         * @function MapVRenderer.prototype.bindEvent
-         * @description 绑定鼠标移动和鼠标点击事件。
-         * @param {Object} e - 触发对象。
-         */
-
-    }, {
-        key: 'bindEvent',
-        value: function bindEvent() {
-            var map = this.map;
-
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.on('click', this.clickEvent);
-                }
-                if (this.options.methods.mousemove) {
-                    map.on('mousemove', this.mousemoveEvent);
-                }
-            }
-            this.map.on('movestart', this._moveStartEvent);
-            this.map.on('moveend', this._moveEndEvent);
-            this.map.on('zoomstart', this._zoomStartEvent);
-        }
-        /**
-         * @function MapVRenderer.prototype.destroy
-         * @description 释放资源。
-         */
-
-    }, {
-        key: 'destroy',
-        value: function destroy() {
-            this.unbindEvent();
-            this.clearData();
-            this.animator && this.animator.stop();
-            this.animator = null;
-            this.canvasLayer = null;
-        }
-        /**
-         * @function MapVRenderer.prototype.unbindEvent
-         * @description 解绑鼠标移动和鼠标滑动触发的事件。
-         * @param {Object} e - 触发对象。
-         */
-
-    }, {
-        key: 'unbindEvent',
-        value: function unbindEvent() {
-            var map = this.map;
-
-            if (this.options.methods) {
-                if (this.options.methods.click) {
-                    map.off('click', this.clickEvent);
-                }
-                if (this.options.methods.mousemove) {
-                    map.off('mousemove', this.mousemoveEvent);
-                }
-            }
-            this.map.off('movestart', this._moveStartEvent);
-            this.map.off('moveend', this._moveEndEvent);
-            this.map.off('zoomstart', this._zoomStartEvent);
-        }
-
-        /**
-         * @function MapVRenderer.prototype.getContext
-         * @description 获取信息。
-         */
-
-    }, {
-        key: 'getContext',
-        value: function getContext() {
-            return this.canvasLayer.getCanvas().getContext(this.context);
-        }
-
-        /**
-         * @function MapVRenderer.prototype.addData
-         * @description 添加数据。
-         * @param {Object} data - 待添加的数据。
-         * @param  {Object} options - 待添加的数据信息。
-         */
-
-    }, {
-        key: 'addData',
-        value: function addData(data, options) {
-            var _data = data;
-            if (data && data.get) {
-                _data = data.get();
-            }
-            this.dataSet.add(_data);
-            this.update({
-                options: options
-            });
-        }
-
-        /**
-         * @function MapVRenderer.prototype.update
-         * @description 更新图层。
-         * @param {Object} opt - 待更新的数据。
-         * @param {Object} opt.data - mapv数据集。
-         * @param {Object} opt.options - mapv绘制参数。
-         */
-
-    }, {
-        key: 'update',
-        value: function update(opt) {
-            var update = opt || {};
-            var _data = update.data;
-            if (_data && _data.get) {
-                _data = _data.get();
-            }
-            if (_data != undefined) {
-                this.dataSet.set(_data);
-            }
-            get(MapVRenderer.prototype.__proto__ || Object.getPrototypeOf(MapVRenderer.prototype), 'update', this).call(this, {
-                options: update.options
-            });
-        }
-
-        /**
-         * @function MapVRenderer.prototype.getData
-         * @description 获取数据
-         */
-
-    }, {
-        key: 'getData',
-        value: function getData() {
-            return this.dataSet;
-        }
-
-        /**
-         * @function MapVRenderer.prototype.removeData
-         * @description 删除符合过滤条件的数据。
-         * @param {Function} filter - 过滤条件。条件参数为数据项，返回值为 true，表示删除该元素；否则表示不删除。
-         */
-
-    }, {
-        key: 'removeData',
-        value: function removeData(_filter) {
-            if (!this.dataSet) {
-                return;
-            }
-            var newData = this.dataSet.get({
-                filter: function filter(data) {
-                    return _filter != null && typeof _filter === "function" ? !_filter(data) : true;
-                }
-            });
-            this.dataSet.set(newData);
-            this.update({
-                options: null
-            });
-        }
-
-        /**
-         * @function MapVRenderer.prototype.clearData
-         * @description 清除数据
-         */
-
-    }, {
-        key: 'clearData',
-        value: function clearData() {
-            this.dataSet && this.dataSet.clear();
-            this.update({
-                options: null
-            });
-        }
-    }, {
-        key: '_canvasUpdate',
-        value: function _canvasUpdate(time) {
-            if (!this.canvasLayer) {
-                return;
-            }
-
-            var self = this;
-
-            var animationOptions = self.options.animation;
-
-            var context = this.getContext();
-            var map = this.map;
-            if (self.isEnabledTime()) {
-                if (time === undefined) {
-                    this.clear(context);
-                    return;
-                }
-                if (this.context === '2d') {
-                    context.save();
-                    context.globalCompositeOperation = 'destination-out';
-                    context.fillStyle = 'rgba(0, 0, 0, .1)';
-                    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-                    context.restore();
-                }
-            } else {
-                this.clear(context);
-            }
-
-            if (this.context === '2d') {
-                for (var key in self.options) {
-                    context[key] = self.options[key];
-                }
-            } else {
-                context.clear(context.COLOR_BUFFER_BIT);
-            }
-
-            if (self.options.minZoom && map.getZoom() < self.options.minZoom || self.options.maxZoom && map.getZoom() > self.options.maxZoom) {
-                return;
-            }
-
-            var bounds = map.getBounds();
-            //获取当前像素下的地理范围
-            var dw = bounds.getEast() - bounds.getWest();
-            var dh = bounds.getNorth() - bounds.getSouth();
-            var mapCanvas = map.getSize();
-
-            var resolutionX = dw / mapCanvas.x,
-                resolutionY = dh / mapCanvas.y;
-            //var centerPx = map.latLngToLayerPoint(map.getCenter());
-
-            //获取屏幕左上角的地理坐标坐标
-            //左上角屏幕坐标为0,0
-            var topLeft = this.canvasLayer.getTopLeft();
-
-            var topLeftPX = map.latLngToContainerPoint(topLeft);
-            // 获取精确的像素坐标. https://github.com/SuperMap/iClient-JavaScript/blob/eacc26952b8915bba0122db751d766056c5fb24d/src/leaflet/core/Base.js
-            // var topLeftPX = map.latLngToAccurateContainerPoint(topLeft);
-            // var lopLeft = map.containerPointToLatLng([0, 0]);
-            var dataGetOptions = {
-                transferCoordinate: function transferCoordinate(coordinate) {
-                    var offset;
-                    if (self.context === '2d') {
-                        offset = map.latLngToContainerPoint(L.latLng(coordinate[1], coordinate[0]));
-                        // offset = map.latLngToAccurateContainerPoint(L.latLng(coordinate[1], coordinate[0]));
-                    } else {
-                        offset = {
-                            'x': (coordinate[0] - topLeft.lng) / resolutionX,
-                            'y': (topLeft.lat - coordinate[1]) / resolutionY
-                        };
-                    }
-                    var pixel = {
-                        x: offset.x - topLeftPX.x,
-                        y: offset.y - topLeftPX.y
-                    };
-                    return [pixel.x, pixel.y];
-                }
-            };
-
-            if (time !== undefined) {
-                dataGetOptions.filter = function (item) {
-                    var trails = animationOptions.trails || 10;
-                    return time && item.time > time - trails && item.time < time;
-                };
-            }
-
-            var data = self.dataSet.get(dataGetOptions);
-
-            this.processData(data);
-
-            self.options._size = self.options.size;
-
-            var worldPoint = map.latLngToContainerPoint(L.latLng(0, 0));
-            var pixel = {
-                x: worldPoint.x - topLeftPX.x,
-                y: worldPoint.y - topLeftPX.y
-            };
-            this.drawContext(context, data, self.options, pixel);
-
-            self.options.updateCallback && self.options.updateCallback(time);
-        }
-    }, {
-        key: 'init',
-        value: function init(options) {
-
-            var self = this;
-
-            self.options = options;
-
-            this.initDataRange(options);
-
-            this.context = self.options.context || '2d';
-
-            if (self.options.zIndex) {
-                this.canvasLayer && this.canvasLayer.setZIndex(self.options.zIndex);
-            }
-
-            this.initAnimator();
-        }
-    }, {
-        key: 'addAnimatorEvent',
-        value: function addAnimatorEvent() {}
-
-        /**
-         * @function MapVRenderer.prototype.moveStartEvent
-         * @description 开始移动事件。
-         */
-
-    }, {
-        key: 'moveStartEvent',
-        value: function moveStartEvent() {
-            var animationOptions = this.options.animation;
-            if (this.isEnabledTime() && this.animator) {
-                this.steps.step = animationOptions.stepsRange.start;
-                this._hide();
-            }
-        }
-
-        /**
-         * @function MapVRenderer.prototype.moveEndEvent
-         * @description 结束移动事件。
-         */
-
-    }, {
-        key: 'moveEndEvent',
-        value: function moveEndEvent() {
-            this.canvasLayer.draw();
-            this._show();
-        }
-
-        /**
-         * @function MapVRenderer.prototype.zoomStartEvent
-         * @description 隐藏渲染样式。
-         */
-
-    }, {
-        key: 'zoomStartEvent',
-        value: function zoomStartEvent() {
-            this._hide();
-        }
-
-        /**
-         * @function MapVRenderer.prototype.clear
-         * @description 清除信息。
-         * @param {string} context - 指定要清除的信息。
-         */
-
-    }, {
-        key: 'clear',
-        value: function clear(context) {
-            context && context.clearRect && context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-        }
-    }, {
-        key: '_hide',
-        value: function _hide() {
-            this.canvasLayer.canvas.style.display = 'none';
-        }
-    }, {
-        key: '_show',
-        value: function _show() {
-            this.canvasLayer.canvas.style.display = 'block';
-        }
-
-        /**
-         * @function MapVRenderer.prototype.draw
-         * @description 绘制渲染
-         */
-
-    }, {
-        key: 'draw',
-        value: function draw() {
-            this.canvasLayer.draw();
-        }
-    }]);
-    return MapVRenderer;
-}(BaseLayer);
-
-var mapVLayer;
-if (typeof L !== 'undefined') {
-    /**
-     * @class mapVLayer
-     * @classdesc MapV 图层。
-     * @category Visualization MapV
-     * @extends {L.Layer}
-     * @param {mapv.DataSet} dataSet - MapV 图层数据集。
-     * @param {Object} mapVOptions - MapV 图层参数。
-     * @param {Object} options - 参数。
-     * @param {string} [options.attributionPrefix] - 版权信息前缀。
-     * @param {string} [options.attribution='© 2018 百度 MapV'] - 版权信息。
-     * @fires mapVLayer#loaded
-     */
-    var MapVLayer = L.Layer.extend({
-
-        options: {
-            attributionPrefix: null,
-            attribution: ''
-        },
-
-        initialize: function initialize(dataSet, mapVOptions, options) {
-            options = options || {};
-            this.dataSet = dataSet || {};
-            this.mapVOptions = mapVOptions || {};
-            this.render = this.render.bind(this);
-            L.Util.setOptions(this, options);
-            if (this.options.attributionPrefix) {
-                this.options.attribution = this.options.attributionPrefix + this.options.attribution;
-            }
-
-            this.canvas = this._createCanvas();
-            L.stamp(this);
-        },
-
-        /**
-         * @private
-         * @function mapVLayer.prototype.onAdd
-         * @description 添加地图图层。
-         * @param {L.Map} map - 要添加的地图。
-         */
-        onAdd: function onAdd(map) {
-            this._map = map;
-            var overlayPane = this.getPane();
-            var container = this.container = L.DomUtil.create("div", "leaflet-layer leaflet-zoom-animated", overlayPane);
-            container.appendChild(this.canvas);
-            var size = map.getSize();
-            container.style.width = size.x + "px";
-            container.style.height = size.y + "px";
-            this.renderer = new MapVRenderer(map, this, this.dataSet, this.mapVOptions);
-            this.draw();
-            /**
-             * @event mapVLayer#loaded
-             * @description 图层添加完成之后触发。
-             */
-            this.fire("loaded");
-        },
-
-        // _hide: function () {
-        //     this.canvas.style.display = 'none';
-        // },
-
-        // _show: function () {
-        //     this.canvas.style.display = 'block';
-        // },
-
-        /**
-         * @private
-         * @function mapVLayer.prototype.onRemove
-         * @description 删除地图图层。
-         */
-        onRemove: function onRemove() {
-            L.DomUtil.remove(this.container);
-            this.renderer.destroy();
-        },
-
-        /**
-         * @function mapVLayer.prototype.addData
-         * @description 追加数据。
-         * @param {Object} data - 要追加的数据。
-         * @param {Object} options - 要追加的值。
-         */
-        addData: function addData(data, options) {
-            this.renderer.addData(data, options);
-        },
-
-        /**
-         * @function mapVLayer.prototype.update
-         * @description 更新图层。
-         * @param {Object} opt - 待更新的数据。
-         * @param {Object} data - mapv 数据集。
-         * @param {Object} options - mapv 绘制参数。
-         */
-        update: function update(opt) {
-            this.renderer.update(opt);
-        },
-
-        /**
-         * @function mapVLayer.prototype.getData
-         * @description 获取数据。
-         * @returns {mapv.DataSet} mapv 数据集。
-         */
-        getData: function getData() {
-            if (this.renderer) {
-                this.dataSet = this.renderer.getData();
-            }
-            return this.dataSet;
-        },
-
-        /**
-         * @function mapVLayer.prototype.removeData
-         * @description 删除符合过滤条件的数据。
-         * @param {Function} filter - 过滤条件。条件参数为数据项，返回值为 true，表示删除该元素；否则表示不删除。
-         * @example
-         *  filter=function(data){
-         *    if(data.id=="1"){
-         *      return true
-         *    }
-         *    return false;
-         *  }
-         */
-        removeData: function removeData(filter) {
-            this.renderer && this.renderer.removeData(filter);
-        },
-
-        /**
-         * @function mapVLayer.prototype.clearData
-         * @description 清除数据。
-         */
-        clearData: function clearData() {
-            this.renderer.clearData();
-        },
-
-        /**
-         * @function mapVLayer.prototype.draw
-         * @description 绘制图层。
-         */
-        draw: function draw() {
-            return this._reset();
-        },
-
-        /**
-         * @function mapVLayer.prototype.setZIndex
-         * @description 设置 canvas 层级。
-         * @param {number} zIndex - canvas 层级。
-         */
-        setZIndex: function setZIndex(zIndex) {
-            this.canvas.style.zIndex = zIndex;
-        },
-
-        /**
-         * @function mapVLayer.prototype.render
-         * @description 渲染。
-         */
-        render: function render() {
-            this.renderer._canvasUpdate();
-        },
-
-        /**
-         * @function mapVLayer.prototype.getCanvas
-         * @description 获取 canvas。
-         * @returns {HTMLElement} 返回 mapV 图层包含的 canvas 对象。
-         */
-        getCanvas: function getCanvas() {
-            return this.canvas;
-        },
-
-        /**
-         * @function mapVLayer.prototype.getContainer
-         * @description 获取容器。
-         * @returns {HTMLElement} 返回包含 mapV 图层的 dom 对象。
-         */
-        getContainer: function getContainer() {
-            return this.container;
-        },
-
-        /**
-         * @function mapVLayer.prototype.getTopLeft
-         * @description 获取左上角坐标。
-         * @returns {L.Bounds} 返回左上角坐标。
-         */
-        getTopLeft: function getTopLeft() {
-            var map = this._map;
-            var topLeft;
-            if (map) {
-                var bounds = map.getBounds();
-                topLeft = bounds.getNorthWest();
-            }
-            return topLeft;
-        },
-
-        _createCanvas: function _createCanvas() {
-            var canvas = document.createElement('canvas');
-            canvas.style.position = 'absolute';
-            canvas.style.top = 0 + "px";
-            canvas.style.left = 0 + "px";
-            canvas.style.pointerEvents = "none";
-            canvas.style.zIndex = this.options.zIndex || 600;
-            var global$2 = typeof window === 'undefined' ? {} : window;
-            var devicePixelRatio = this.devicePixelRatio = global$2.devicePixelRatio;
-            if (!this.mapVOptions.context || this.mapVOptions.context === '2d') {
-                canvas.getContext('2d').scale(devicePixelRatio, devicePixelRatio);
-            }
-            return canvas;
-        },
-
-        _resize: function _resize() {
-            var canvas = this.canvas;
-            if (!canvas) {
-                return;
-            }
-
-            var map = this._map;
-            var size = map.getSize();
-            canvas.width = size.x;
-            canvas.height = size.y;
-            canvas.style.width = size.x + 'px';
-            canvas.style.height = size.y + 'px';
-            var bounds = map.getBounds();
-            var topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
-            L.DomUtil.setPosition(canvas, topLeft);
-        },
-
-        _reset: function _reset() {
-            this._resize();
-            this._render();
-        },
-        redraw: function redraw() {
-            this._resize();
-            this._render();
-        },
-        _render: function _render() {
-            this.render();
-        }
-
-    });
-
-    mapVLayer = function mapVLayer(dataSet, mapVOptions, options) {
-        return new MapVLayer(dataSet, mapVOptions, options);
-    };
-}
-var mapVLayer$1 = mapVLayer;
-
-var MapVRenderer$1 = function (_BaseLayer) {
     inherits(MapVRenderer, _BaseLayer);
 
     /**
@@ -8811,368 +4979,209 @@ var MapVRenderer$1 = function (_BaseLayer) {
     return MapVRenderer;
 }(BaseLayer);
 
-var mapVLayer$2;
-if (typeof Cesium !== 'undefined') {
-    var defIndex = 0;
-    var r = Cesium;
+var defIndex = 0;
 
-    var MapVLayer$1 = function () {
-        /**
-         *Creates an instance of MapVLayer.
-         * @param {*} viewer
-         * @param {*} dataset
-         * @param {*} options
-         * @param {*} container default viewer.container
-         * @memberof MapVLayer
-         */
-        function MapVLayer(viewer, dataset, options, container) {
-            classCallCheck(this, MapVLayer);
+var MapVLayer = function () {
+    /**
+     *Creates an instance of MapVLayer.
+     * @param {*} viewer
+     * @param {*} dataset
+     * @param {*} options
+     * @param {*} container default viewer.container
+     * @memberof MapVLayer
+     */
+    function MapVLayer(viewer, dataset, options) {
+        var container = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : undefined;
+        classCallCheck(this, MapVLayer);
 
-            this.map = viewer, this.scene = viewer.scene, this.mapvBaseLayer = new MapVRenderer$1(viewer, dataset, options, this), this.mapVOptions = options, this.initDevicePixelRatio(), this.canvas = this._createCanvas(), this.render = this.render.bind(this);
-            if (container) {
-                this.container = container;
-            } else {
-                var inner = viewer.container.querySelector('.cesium-viewer-cesiumWidgetContainer');
-                this.container = inner ? inner : viewer.container;
-            }
-            this.addInnerContainer();
-
-            // void 0 != container ? (this.container = container,
-            //     container.appendChild(this.canvas)) : (this.container = viewer.container,
-            //         this.addInnerContainer()),
-            this.bindEvent();
-            this._reset();
+        this.map = viewer, this.scene = viewer.scene, this.mapvBaseLayer = new MapVRenderer(viewer, dataset, options, this), this.mapVOptions = options, this.initDevicePixelRatio(), this.canvas = this._createCanvas(), this.render = this.render.bind(this);
+        if (container) {
+            this.container = container;
+        } else {
+            var inner = viewer.container.querySelector('.cesium-viewer-cesiumWidgetContainer');
+            this.container = inner ? inner : viewer.container;
         }
+        this.addInnerContainer();
 
-        createClass(MapVLayer, [{
-            key: 'initDevicePixelRatio',
-            value: function initDevicePixelRatio() {
-                this.devicePixelRatio = window.devicePixelRatio || 1;
-            }
-        }, {
-            key: 'addInnerContainer',
-            value: function addInnerContainer() {
-                this.container.appendChild(this.canvas);
-            }
-        }, {
-            key: 'bindEvent',
-            value: function bindEvent() {
-                var that = this;
+        // void 0 != container ? (this.container = container,
+        //     container.appendChild(this.canvas)) : (this.container = viewer.container,
+        //         this.addInnerContainer()),
+        this.bindEvent();
+        this._reset();
+    }
 
-                this.innerMoveStart = this.moveStartEvent.bind(this);
-                this.innerMoveEnd = this.moveEndEvent.bind(this);
-                this.scene.camera.moveStart.addEventListener(this.innerMoveStart, this);
-                this.scene.camera.moveEnd.addEventListener(this.innerMoveEnd, this);
+    createClass(MapVLayer, [{
+        key: 'initDevicePixelRatio',
+        value: function initDevicePixelRatio() {
+            this.devicePixelRatio = window.devicePixelRatio || 1;
+        }
+    }, {
+        key: 'addInnerContainer',
+        value: function addInnerContainer() {
+            this.container.appendChild(this.canvas);
+        }
+    }, {
+        key: 'bindEvent',
+        value: function bindEvent() {
+            var that = this;
 
-                var t = new Cesium.ScreenSpaceEventHandler(this.scene.canvas);
+            this.innerMoveStart = this.moveStartEvent.bind(this);
+            this.innerMoveEnd = this.moveEndEvent.bind(this);
+            this.scene.camera.moveStart.addEventListener(this.innerMoveStart, this);
+            this.scene.camera.moveEnd.addEventListener(this.innerMoveEnd, this);
 
-                t.setInputAction(function (t) {
-                    that.innerMoveEnd();
-                }, Cesium.ScreenSpaceEventType.LEFT_UP);
-                t.setInputAction(function (t) {
-                    that.innerMoveEnd();
-                }, Cesium.ScreenSpaceEventType.MIDDLE_UP);
-                this.handler = t;
+            var t = new Cesium.ScreenSpaceEventHandler(this.scene.canvas);
+
+            t.setInputAction(function (t) {
+                that.innerMoveEnd();
+            }, Cesium.ScreenSpaceEventType.LEFT_UP);
+            t.setInputAction(function (t) {
+                that.innerMoveEnd();
+            }, Cesium.ScreenSpaceEventType.MIDDLE_UP);
+            this.handler = t;
+        }
+    }, {
+        key: 'unbindEvent',
+        value: function unbindEvent() {
+            this.scene.camera.moveStart.removeEventListener(this.innerMoveStart, this);
+            this.scene.camera.moveEnd.removeEventListener(this.innerMoveEnd, this);
+            this.scene.postRender.removeEventListener(this._reset, this);
+            this.handler && (this.handler.destroy(), this.handler = null);
+        }
+    }, {
+        key: 'moveStartEvent',
+        value: function moveStartEvent() {
+            if (this.mapvBaseLayer) {
+                this.mapvBaseLayer.animatorMovestartEvent();
+                this.scene.postRender.addEventListener(this._reset, this);
             }
-        }, {
-            key: 'unbindEvent',
-            value: function unbindEvent() {
-                this.scene.camera.moveStart.removeEventListener(this.innerMoveStart, this);
-                this.scene.camera.moveEnd.removeEventListener(this.innerMoveEnd, this);
-                this.scene.postRender.removeEventListener(this._reset, this);
-                this.handler && (this.handler.destroy(), this.handler = null);
-            }
-        }, {
-            key: 'moveStartEvent',
-            value: function moveStartEvent() {
-                if (this.mapvBaseLayer) {
-                    this.mapvBaseLayer.animatorMovestartEvent();
-                    this.scene.postRender.addEventListener(this._reset, this);
-                }
-            }
-        }, {
-            key: 'moveEndEvent',
-            value: function moveEndEvent() {
-                if (this.mapvBaseLayer) {
-                    this.scene.postRender.removeEventListener(this._reset, this), this.mapvBaseLayer.animatorMoveendEvent();
-                    this._reset();
-                }
-            }
-        }, {
-            key: 'zoomStartEvent',
-            value: function zoomStartEvent() {
-                this._unvisiable();
-            }
-        }, {
-            key: 'zoomEndEvent',
-            value: function zoomEndEvent() {
-                this._unvisiable();
-            }
-        }, {
-            key: 'addData',
-            value: function addData(t, e) {
-                void 0 != this.mapvBaseLayer && this.mapvBaseLayer.addData(t, e);
-            }
-        }, {
-            key: 'updateData',
-            value: function updateData(t, e) {
-                void 0 != this.mapvBaseLayer && this.mapvBaseLayer.updateData(t, e);
-            }
-        }, {
-            key: 'getData',
-            value: function getData() {
-                return this.mapvBaseLayer && (this.dataSet = this.mapvBaseLayer.getData()), this.dataSet;
-            }
-        }, {
-            key: 'removeData',
-            value: function removeData(t) {
-                void 0 != this.mapvBaseLayer && this.mapvBaseLayer && this.mapvBaseLayer.removeData(t);
-            }
-        }, {
-            key: 'removeAllData',
-            value: function removeAllData() {
-                void 0 != this.mapvBaseLayer && this.mapvBaseLayer.clearData();
-            }
-        }, {
-            key: '_visiable',
-            value: function _visiable() {
-                return this.canvas.style.display = "block", this;
-            }
-        }, {
-            key: '_unvisiable',
-            value: function _unvisiable() {
-                return this.canvas.style.display = "none", this;
-            }
-        }, {
-            key: '_createCanvas',
-            value: function _createCanvas() {
-                var t = document.createElement("canvas");
-                t.id = this.mapVOptions.layerid || "mapv" + defIndex++, t.style.position = "absolute", t.style.top = "0px", t.style.left = "0px", t.style.pointerEvents = "none", t.style.zIndex = this.mapVOptions.zIndex || 0, t.width = parseInt(this.map.canvas.width), t.height = parseInt(this.map.canvas.height), t.style.width = this.map.canvas.style.width, t.style.height = this.map.canvas.style.height;
-                var e = this.devicePixelRatio;
-                return "2d" == this.mapVOptions.context && t.getContext(this.mapVOptions.context).scale(e, e), t;
-            }
-        }, {
-            key: '_reset',
-            value: function _reset() {
-                this.resizeCanvas();
-                this.fixPosition();
-                this.onResize();
-                this.render();
-            }
-        }, {
-            key: 'draw',
-            value: function draw() {
+        }
+    }, {
+        key: 'moveEndEvent',
+        value: function moveEndEvent() {
+            if (this.mapvBaseLayer) {
+                this.scene.postRender.removeEventListener(this._reset, this), this.mapvBaseLayer.animatorMoveendEvent();
                 this._reset();
             }
-        }, {
-            key: 'show',
-            value: function show() {
-                this._visiable();
-            }
-        }, {
-            key: 'hide',
-            value: function hide() {
-                this._unvisiable();
-            }
-        }, {
-            key: 'destroy',
-            value: function destroy() {
-                this.remove();
-            }
-        }, {
-            key: 'remove',
-            value: function remove() {
-                void 0 != this.mapvBaseLayer && (this.removeAllData(), this.mapvBaseLayer.clear(this.mapvBaseLayer.getContext()), this.mapvBaseLayer = void 0, this.canvas.parentElement.removeChild(this.canvas));
-            }
-        }, {
-            key: 'update',
-            value: function update(t) {
-                void 0 != t && this.updateData(t.data, t.options);
-            }
-        }, {
-            key: 'resizeCanvas',
-            value: function resizeCanvas() {
-                if (void 0 != this.canvas && null != this.canvas) {
-                    var t = this.canvas;
-                    t.style.position = "absolute", t.style.top = "0px", t.style.left = "0px", t.width = parseInt(this.map.canvas.width), t.height = parseInt(this.map.canvas.height), t.style.width = this.map.canvas.style.width, t.style.height = this.map.canvas.style.height;
-                }
-            }
-        }, {
-            key: 'fixPosition',
-            value: function fixPosition() {}
-        }, {
-            key: 'onResize',
-            value: function onResize() {}
-        }, {
-            key: 'render',
-            value: function render() {
-                void 0 != this.mapvBaseLayer && this.mapvBaseLayer._canvasUpdate();
-            }
-        }]);
-        return MapVLayer;
-    }();
-
-    mapVLayer$2 = function mapVLayer(viewer, dataSet, mapVOptions, container) {
-        return new MapVLayer$1(viewer, dataSet, mapVOptions, container);
-    };
-}
-
-var mapVLayer$3 = mapVLayer$2;
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-var geojson = {
-    getDataSet: function getDataSet(geoJson) {
-
-        var data = [];
-        var features = geoJson.features;
-        if (features) {
-            for (var i = 0; i < features.length; i++) {
-                var feature = features[i];
-                var geometry = feature.geometry;
-                var properties = feature.properties;
-                var item = {};
-                for (var key in properties) {
-                    item[key] = properties[key];
-                }
-                item.geometry = geometry;
-                data.push(item);
+        }
+    }, {
+        key: 'zoomStartEvent',
+        value: function zoomStartEvent() {
+            this._unvisiable();
+        }
+    }, {
+        key: 'zoomEndEvent',
+        value: function zoomEndEvent() {
+            this._unvisiable();
+        }
+    }, {
+        key: 'addData',
+        value: function addData(t, e) {
+            void 0 != this.mapvBaseLayer && this.mapvBaseLayer.addData(t, e);
+        }
+    }, {
+        key: 'updateData',
+        value: function updateData(t, e) {
+            void 0 != this.mapvBaseLayer && this.mapvBaseLayer.updateData(t, e);
+        }
+    }, {
+        key: 'getData',
+        value: function getData() {
+            return this.mapvBaseLayer && (this.dataSet = this.mapvBaseLayer.getData()), this.dataSet;
+        }
+    }, {
+        key: 'removeData',
+        value: function removeData(t) {
+            void 0 != this.mapvBaseLayer && this.mapvBaseLayer && this.mapvBaseLayer.removeData(t);
+        }
+    }, {
+        key: 'removeAllData',
+        value: function removeAllData() {
+            void 0 != this.mapvBaseLayer && this.mapvBaseLayer.clearData();
+        }
+    }, {
+        key: '_visiable',
+        value: function _visiable() {
+            return this.canvas.style.display = "block", this;
+        }
+    }, {
+        key: '_unvisiable',
+        value: function _unvisiable() {
+            return this.canvas.style.display = "none", this;
+        }
+    }, {
+        key: '_createCanvas',
+        value: function _createCanvas() {
+            var t = document.createElement("canvas");
+            t.id = this.mapVOptions.layerid || "mapv" + defIndex++, t.style.position = "absolute", t.style.top = "0px", t.style.left = "0px", t.style.pointerEvents = "none", t.style.zIndex = this.mapVOptions.zIndex || 0, t.width = parseInt(this.map.canvas.width), t.height = parseInt(this.map.canvas.height), t.style.width = this.map.canvas.style.width, t.style.height = this.map.canvas.style.height;
+            var e = this.devicePixelRatio;
+            return "2d" == this.mapVOptions.context && t.getContext(this.mapVOptions.context).scale(e, e), t;
+        }
+    }, {
+        key: '_reset',
+        value: function _reset() {
+            this.resizeCanvas();
+            this.fixPosition();
+            this.onResize();
+            this.render();
+        }
+    }, {
+        key: 'draw',
+        value: function draw() {
+            this._reset();
+        }
+    }, {
+        key: 'show',
+        value: function show() {
+            this._visiable();
+        }
+    }, {
+        key: 'hide',
+        value: function hide() {
+            this._unvisiable();
+        }
+    }, {
+        key: 'destroy',
+        value: function destroy() {
+            this.remove();
+        }
+    }, {
+        key: 'remove',
+        value: function remove() {
+            void 0 != this.mapvBaseLayer && (this.removeAllData(), this.mapvBaseLayer.clear(this.mapvBaseLayer.getContext()), this.mapvBaseLayer = void 0, this.canvas.parentElement.removeChild(this.canvas));
+        }
+    }, {
+        key: 'update',
+        value: function update(t) {
+            void 0 != t && this.updateData(t.data, t.options);
+        }
+    }, {
+        key: 'resizeCanvas',
+        value: function resizeCanvas() {
+            if (void 0 != this.canvas && null != this.canvas) {
+                var t = this.canvas;
+                t.style.position = "absolute", t.style.top = "0px", t.style.left = "0px", t.width = parseInt(this.map.canvas.width), t.height = parseInt(this.map.canvas.height), t.style.width = this.map.canvas.style.width, t.style.height = this.map.canvas.style.height;
             }
         }
-        return new DataSet(data);
-    }
-};
-
-/**
- * @author kyle / http://nikai.us/
- */
-
-var csv = {
-    CSVToArray: function CSVToArray(strData, strDelimiter) {
-        // Check to see if the delimiter is defined. If not,
-        // then default to comma.
-        strDelimiter = strDelimiter || ",";
-
-        // Create a regular expression to parse the CSV values.
-        var objPattern = new RegExp(
-        // Delimiters.
-        "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
-
-        // Quoted fields.
-        "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
-
-        // Standard fields.
-        "([^\"\\" + strDelimiter + "\\r\\n]*))", "gi");
-
-        // Create an array to hold our data. Give the array
-        // a default empty first row.
-        var arrData = [[]];
-
-        // Create an array to hold our individual pattern
-        // matching groups.
-        var arrMatches = null;
-
-        // Keep looping over the regular expression matches
-        // until we can no longer find a match.
-        while (arrMatches = objPattern.exec(strData)) {
-
-            // Get the delimiter that was found.
-            var strMatchedDelimiter = arrMatches[1];
-
-            // Check to see if the given delimiter has a length
-            // (is not the start of string) and if it matches
-            // field delimiter. If id does not, then we know
-            // that this delimiter is a row delimiter.
-            if (strMatchedDelimiter.length && strMatchedDelimiter !== strDelimiter) {
-
-                // Since we have reached a new row of data,
-                // add an empty row to our data array.
-                arrData.push([]);
-            }
-
-            var strMatchedValue;
-
-            // Now that we have our delimiter out of the way,
-            // let's check to see which kind of value we
-            // captured (quoted or unquoted).
-            if (arrMatches[2]) {
-
-                // We found a quoted value. When we capture
-                // this value, unescape any double quotes.
-                strMatchedValue = arrMatches[2].replace(new RegExp("\"\"", "g"), "\"");
-            } else {
-
-                // We found a non-quoted value.
-                strMatchedValue = arrMatches[3];
-            }
-
-            // Now that we have our value string, let's add
-            // it to the data array.
-            arrData[arrData.length - 1].push(strMatchedValue);
+    }, {
+        key: 'fixPosition',
+        value: function fixPosition() {}
+    }, {
+        key: 'onResize',
+        value: function onResize() {}
+    }, {
+        key: 'render',
+        value: function render() {
+            void 0 != this.mapvBaseLayer && this.mapvBaseLayer._canvasUpdate();
         }
+    }]);
+    return MapVLayer;
+}();
 
-        // Return the parsed data.
-        return arrData;
-    },
-
-    getDataSet: function getDataSet(csvStr, split) {
-
-        var arr = this.CSVToArray(csvStr, split || ',');
-
-        var data = [];
-
-        var header = arr[0];
-
-        for (var i = 1; i < arr.length - 1; i++) {
-            var line = arr[i];
-            var item = {};
-            for (var j = 0; j < line.length; j++) {
-                var value = line[j];
-                if (header[j] == 'geometry') {
-                    value = JSON.parse(value);
-                }
-                item[header[j]] = value;
-            }
-            data.push(item);
-        }
-
-        return new DataSet(data);
-    }
-};
-
-exports.version = version;
-exports.canvasClear = clear;
-exports.canvasResolutionScale = resolutionScale$1;
-exports.canvasDrawSimple = drawSimple;
-exports.canvasDrawHeatmap = drawHeatmap;
-exports.canvasDrawGrid = drawGrid;
-exports.canvasDrawHoneycomb = drawHoneycomb;
-exports.webglDrawSimple = webglDrawSimple;
-exports.webglDrawPoint = point;
-exports.webglDrawLine = line;
-exports.webglDrawPolygon = polygon;
-exports.utilCityCenter = cityCenter;
-exports.utilCurve = curve;
-exports.utilForceEdgeBundling = ForceEdgeBundling;
-exports.utilDataRangeIntensity = Intensity;
-exports.utilDataRangeCategory = Category;
-exports.utilDataRangeChoropleth = Choropleth;
-exports.Map = MapHelper;
-exports.baiduMapCanvasLayer = CanvasLayer;
-exports.baiduMapAnimationLayer = AnimationLayer;
-exports.baiduMapLayer = Layer;
-exports.googleMapCanvasLayer = CanvasLayer$2;
-exports.googleMapLayer = Layer$2;
-exports.MaptalksLayer = Layer$5;
-exports.AMapLayer = Layer$6;
-exports.OpenlayersLayer = Layer$8;
-exports.leafletMapLayer = mapVLayer$1;
-exports.cesiumMapLayer = mapVLayer$3;
+exports.CesiumMapLayer = MapVLayer;
+exports.MapVRenderer = MapVRenderer;
+exports.BaseLayer = BaseLayer;
 exports.DataSet = DataSet;
-exports.geojson = geojson;
-exports.csv = csv;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
