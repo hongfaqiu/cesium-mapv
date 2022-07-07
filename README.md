@@ -119,6 +119,9 @@ class MapVRenderer {
   /** 销毁当前图层 */
   destroy(): void;
 }
+
+/** 将geojson数据转化为Dataset, 仅支持FeatureCollection */
+function getDataSet(geojson: GeoJSON.GeoJSON): DataSet
 ```
 
 ## Credit

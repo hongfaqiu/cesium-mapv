@@ -298,5 +298,5 @@ declare module 'cesium-mapv' {
   }
 
   /** 将geojson数据转化为Dataset, 仅支持FeatureCollection */
-  export function getDataSet(geojson: any): DataSet
+  export function getDataSet(geojson: GeoJSON.GeoJSON): DataSet
 }
