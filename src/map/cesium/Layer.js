@@ -35,12 +35,12 @@ class CesiumMapLayer {
   }
 
   get show() {
-    return this.viewer.style.display === "block"
+    return this.canvas.style.display === "block"
   }
 
   set show(val) {
-    if (val) this.show()
-    else this.hide()
+    if (val) this._visiable()
+    else this._unvisiable()
   }
 
   initDevicePixelRatio() {
@@ -141,14 +141,9 @@ class CesiumMapLayer {
   draw() {
       this._reset()
   }
-  show() {
-      this._visiable()
-  }
-  hide() {
-      this._unvisiable()
-  }
   destroy() {
-      this.remove()
+    this.remove()
+    this.unbindEvent()
   }
   remove() {
       void 0 != this.mapvBaseLayer && (this.removeAllData(),

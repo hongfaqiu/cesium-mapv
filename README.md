@@ -101,6 +101,8 @@ class CesiumMapLayer {
 class MapVRenderer {
   dataSet: MapVDataSet;
   options: MapVOptions;
+  /** get or set layer visible */
+  show: boolean;
   /**
    *Creates an instance of MapVLayer.
   * @param {*} viewer
@@ -114,10 +116,6 @@ class MapVRenderer {
   update(options: Partial<MapVOptions>): void;
   /** 重新设置配置 */
   setOptions(options: Partial<MapVOptions>): void;
-  /** 显示图层 */
-  show(): void;
-  /** 隐藏图层 */
-  hide(): void;
   /** 销毁当前图层 */
   destroy(): void;
 }

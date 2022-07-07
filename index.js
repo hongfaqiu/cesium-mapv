@@ -4,3 +4,4 @@ export { default as BaseLayer } from "./src/map/BaseLayer";
 
 export { default as DataSet } from "./src/data/DataSet";
 
+export { default as getDataSet } from "./src/data/geojson";

@@ -268,11 +268,6 @@ declare module 'cesium-mapv' {
     remove(): void;
     resizeCanvas(): void;
 
-    /** 显示图层 */
-    show(): void;
-    /** 隐藏图层 */
-    hide(): void;
-
     update(opts: {
       data?: MapVDataSet;
       options?: MapVOptions;
@@ -301,4 +296,7 @@ declare module 'cesium-mapv' {
     /** 销毁当前图层 */
     destroy(): void;
   }
+
+  /** 将geojson数据转化为Dataset, 仅支持FeatureCollection */
+  export function getDataSet(geojson: any): DataSet
 }

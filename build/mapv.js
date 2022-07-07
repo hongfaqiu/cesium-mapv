@@ -5131,19 +5131,10 @@ var CesiumMapLayer = function () {
             this._reset();
         }
     }, {
-        key: 'show',
-        value: function show() {
-            this._visiable();
-        }
-    }, {
-        key: 'hide',
-        value: function hide() {
-            this._unvisiable();
-        }
-    }, {
         key: 'destroy',
         value: function destroy() {
             this.remove();
+            this.unbindEvent();
         }
     }, {
         key: 'remove',
@@ -5177,19 +5168,44 @@ var CesiumMapLayer = function () {
     }, {
         key: 'show',
         get: function get$$1() {
-            return this.viewer.style.display === "block";
+            return this.canvas.style.display === "block";
         },
         set: function set$$1(val) {
-            if (val) this.show();else this.hide();
+            if (val) this._visiable();else this._unvisiable();
         }
     }]);
     return CesiumMapLayer;
 }();
 
+/**
+ * @author kyle / http://nikai.us/
+ */
+
+function getDataSet(geoJson) {
+
+    var data = [];
+    var features = geoJson.features;
+    if (features) {
+        for (var i = 0; i < features.length; i++) {
+            var feature = features[i];
+            var geometry = feature.geometry;
+            var properties = feature.properties;
+            var item = {};
+            for (var key in properties) {
+                item[key] = properties[key];
+            }
+            item.geometry = geometry;
+            data.push(item);
+        }
+    }
+    return new DataSet(data);
+}
+
 exports.CesiumMapLayer = CesiumMapLayer;
 exports.MapVRenderer = MapVRenderer;
 exports.BaseLayer = BaseLayer;
 exports.DataSet = DataSet;
+exports.getDataSet = getDataSet;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
